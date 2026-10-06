@@ -7,4 +7,10 @@
    <FileRef
       location = "group:Pods/Pods.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:MarketCore.xctestplan">
+   </FileRef>
+   <FileRef
+      location = "group:MarketPresentation.xctestplan">
+   </FileRef>
 </Workspace>
