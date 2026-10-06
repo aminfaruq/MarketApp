@@ -90,7 +90,7 @@ public final class RemoteLiveMarketStreamService: LiveMarketStreamService, @unch
         let v: Double // volume
         
         func toModel() -> LiveTradeModel {
-            LiveTradeModel(
+            .init(
                 symbol: s,
                 price: p,
                 volume: v,
