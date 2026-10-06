@@ -10,6 +10,10 @@ import MarketCore
 
 final class URLSessionWebSocketClient {
     
+    public enum Error: Swift.Error, Equatable {
+        case notConnected
+    }
+    
     private let session: WebSocketSession
     private var task: WebSocketTask?
     private var receiveTask: Task<Void, Never>?
@@ -42,6 +46,13 @@ final class URLSessionWebSocketClient {
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
         eventContinuation.yield(.disconnected)
+    }
+    
+    func send(text: String) async throws {
+        guard let task = task else {
+            throw Error.notConnected
+        }
+        try await task.send(.string(text))
     }
     
     deinit {
@@ -84,6 +95,19 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         
         let event = await iterator.next()
         XCTAssertEqual(event, .disconnected)
+    }
+    
+    func test_send_failsWhenNotConnected() async {
+        let (sut, _) = makeSUT()
+        
+        do {
+            try await sut.send(text: "any text")
+            XCTFail("Expected error but succeeded")
+        } catch let error as URLSessionWebSocketClient.Error {
+            XCTAssertEqual(error, .notConnected)
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
     
     // MARK: - Helpers
