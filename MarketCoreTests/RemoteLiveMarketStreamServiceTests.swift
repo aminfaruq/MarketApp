@@ -75,14 +75,8 @@ final class RemoteLiveMarketStreamService {
         guard let data = text.data(using: .utf8), let response = try? JSONDecoder().decode(FinnhubWebSocketResponseDTO.self, from: data), response.type == "trade", let trades = response.data else { return }
         
         for tradeDTO in trades {
-            let model = LiveTradeModel(
-                symbol: tradeDTO.s,
-                price: tradeDTO.p,
-                volume: tradeDTO.v,
-                timestamp: Date(timeIntervalSince1970: tradeDTO.t / 1000.0)
-            )
-            streamContinuation.yield(model)
-        }
+            streamContinuation.yield(tradeDTO.toModel())
+        }        
     }
     
     private struct FinnhubWebSocketResponseDTO: Decodable {
@@ -94,6 +88,15 @@ final class RemoteLiveMarketStreamService {
         let s: String // symbol
         let t: Double // timestamp (milliseconds)
         let v: Double // volume
+        
+        func toModel() -> LiveTradeModel {
+            LiveTradeModel(
+                symbol: s,
+                price: p,
+                volume: v,
+                timestamp: Date(timeIntervalSince1970: t / 1000.0)
+            )
+        }
     }
 }
 
