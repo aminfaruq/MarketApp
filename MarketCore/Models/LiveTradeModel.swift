@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct LiveTradeModel: Equatable {
+public struct LiveTradeModel: Equatable, Sendable {
     public let symbol: String
     public let price: Double
     public let volume: Double
