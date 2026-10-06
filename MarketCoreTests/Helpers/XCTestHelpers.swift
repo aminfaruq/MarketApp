@@ -34,3 +34,7 @@ func anyNSError() -> NSError {
 func anyToken() -> String {
     "423535"
 }
+
+func anyString() -> String {
+    "AAPL"
+}
