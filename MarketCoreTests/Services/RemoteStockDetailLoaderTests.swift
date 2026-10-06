@@ -51,20 +51,30 @@ final class RemoteStockDetailLoader {
             throw Error.connectivity
         }
         
-        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RemoteProfileDTO.self, from: data) else { throw Error.invalidData }
+        guard response.statusCode == 200, let data = try? JSONDecoder().decode(RemoteProfileDTO.self, from: data) else { throw Error.invalidData }
         
-        // Dummy
-        return CompanyProfileModel(
-            symbol: "symbol",
-            name: "name",
-            logoURL: URL(string: ""),
-            industry: "industry",
-            currency: "currency",
-            exchange: "exchange"
-        )
+        return data.toModel()
     }
     
-    private struct RemoteProfileDTO: Decodable {}
+    private struct RemoteProfileDTO: Decodable {
+        let ticker: String
+        let name: String
+        let currency: String
+        let exchange: String
+        let logo: String
+        let finnhubIndustry: String
+        
+        func toModel() -> CompanyProfileModel {
+            .init(
+                symbol: ticker,
+                name: name,
+                logoURL: URL(string: logo),
+                industry: finnhubIndustry,
+                currency: currency,
+                exchange: exchange
+            )
+        }
+    }
 }
 
 final class RemoteStockDetailLoaderTests: XCTestCase {
@@ -117,6 +127,18 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         await assertThat(sut, throws: .invalidData)
     }
     
+    func test_loadProfile_deliversProfileOn200StatusCodeWithValidJSON() async throws {
+        let (sut, spy) = makeSUT()
+        let query = "AAPL"
+        let profile = makeProfile(symbol: "AAPL", name: "Apple Inc")
+        
+        let validJSONData = makeProfileData(profile.json)
+        spy.stub(statusCode: 200, data: validJSONData)
+        
+        let receivedProfile = try await sut.loadProfile(symbol: query)
+        
+        XCTAssertEqual(receivedProfile, profile.model)
+    }
     
     //MARK: - HELPERS
     private func makeSUT(
@@ -148,5 +170,39 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         } catch {
             XCTFail("Expected \(expectedError), got failure \(error)", file: file, line: line)
         }
+    }
+    
+    private func makeProfileData(_ json: [String: Any]) -> Data {
+        return try! JSONSerialization.data(withJSONObject: json)
+    }
+    
+    private func makeProfile(
+        symbol: String = "AAPL",
+        name: String = "Apple Inc",
+        currency: String = "USD",
+        exchange: String = "NASDAQ",
+        logo: String = "https://example.com/logo.png",
+        industry: String = "Technology",
+    ) -> (model: CompanyProfileModel, json: [String: Any]) {
+        
+        let model = CompanyProfileModel(
+            symbol: symbol,
+            name: name,
+            logoURL: URL(string: logo),
+            industry: industry,
+            currency: currency,
+            exchange: exchange
+        )
+        
+        let json: [String: Any] = [
+            "ticker": symbol,
+            "name": name,
+            "currency": currency,
+            "exchange": exchange,
+            "logo": logo,
+            "finnhubIndustry": industry,
+        ]
+        
+        return (model, json)
     }
 }
