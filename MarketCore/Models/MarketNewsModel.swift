@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct MarketNewsModel: Equatable, Identifiable {
+public struct MarketNewsModel: Equatable, Identifiable, Sendable {
     public let id: Int
     public let headline: String
     public let summary: String
