@@ -1,0 +1,35 @@
+{
+  "configurations" : [
+    {
+      "id" : "04AF58D4-239D-4EE6-9B57-BE8C45B1CD22",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : {
+      "targets" : [
+        {
+          "containerPath" : "container:MarketApp.xcodeproj",
+          "identifier" : "834EBB873075434D0057946D",
+          "name" : "MarketCore"
+        }
+      ]
+    },
+    "performanceAntipatternCheckerEnabled" : true,
+    "testExecutionOrdering" : "random"
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:MarketApp.xcodeproj",
+        "identifier" : "834EBB8F3075434D0057946D",
+        "name" : "MarketCoreTests"
+      }
+    }
+  ],
+  "version" : 1
+}
