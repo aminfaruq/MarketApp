@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class URLSessionWebSocketClient {
+public final class URLSessionWebSocketClient: WebSocketClient, @unchecked Sendable {
     
     public enum Error: Swift.Error, Equatable {
         case notConnected
