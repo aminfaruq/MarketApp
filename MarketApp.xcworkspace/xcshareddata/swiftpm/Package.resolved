@@ -1,0 +1,24 @@
+{
+  "originHash" : "ec714bdeba50e18d15277044c262fe3a64746ade71bf757cef729e4fdcc2587a",
+  "pins" : [
+    {
+      "identity" : "iglistkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Instagram/IGListKit.git",
+      "state" : {
+        "revision" : "894c34db0593a0049520ccf9444803db78c64c28",
+        "version" : "5.2.0"
+      }
+    },
+    {
+      "identity" : "rxswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ReactiveX/RxSwift.git",
+      "state" : {
+        "revision" : "132aea4f236ccadc51590b38af0357a331d51fa2",
+        "version" : "6.10.2"
+      }
+    }
+  ],
+  "version" : 3
+}
