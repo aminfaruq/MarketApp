@@ -12,6 +12,7 @@ final class URLSessionWebSocketClient {
     
     private let session: WebSocketSession
     private var task: WebSocketTask?
+    private var receiveTask: Task<Void, Never>?
     
     private let eventContinuation: AsyncStream<WebSocketEvent>.Continuation
     public let events: AsyncStream<WebSocketEvent>
@@ -35,7 +36,16 @@ final class URLSessionWebSocketClient {
     
     private func startReceiving(from task: WebSocketTask) {}
     
+    func disconnect() {
+        receiveTask?.cancel()
+        receiveTask = nil
+        task?.cancel(with: .normalClosure, reason: nil)
+        task = nil
+        eventContinuation.yield(.disconnected)
+    }
+    
     deinit {
+        disconnect()
         eventContinuation.finish()
     }
 }
@@ -61,6 +71,19 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         
         let event = await iterator.next()
         XCTAssertEqual(event, .connected)
+    }
+    
+    func test_disconnect_cancelsTaskAndEmitsDisconnected() async {
+        let (sut, _) = makeSUT()
+        var iterator = sut.events.makeAsyncIterator()
+        
+        sut.connect(to: anyURL())
+        _ = await iterator.next()
+        
+        sut.disconnect()
+        
+        let event = await iterator.next()
+        XCTAssertEqual(event, .disconnected)
     }
     
     // MARK: - Helpers
