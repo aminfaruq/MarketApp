@@ -21,6 +21,10 @@ final class RemoteLiveMarketStreamService {
     func connect() {
         client.connect(to: url)
     }
+    
+    func disconnect() {
+        client.disconnect()
+    }
 }
 
 final class RemoteLiveMarketStreamServiceTests: XCTestCase {
@@ -39,6 +43,14 @@ final class RemoteLiveMarketStreamServiceTests: XCTestCase {
         sut.connect()
         
         XCTAssertEqual(client.connectedURL, url)
+    }
+    
+    func test_disconnect_disconnectsClient() {
+        let (sut, client) = makeSUT()
+        
+        sut.disconnect()
+        
+        XCTAssertTrue(client.didDisconnect)
     }
     
     private func makeSUT(
