@@ -25,6 +25,12 @@ final class RemoteLiveMarketStreamService {
     func disconnect() {
         client.disconnect()
     }
+    
+    func subscribe(to symbol: String) async throws {
+        let payload = #"{"symbol":"\#(symbol)","type":"subscribe"}"#
+
+        try await client.send(text: payload)
+    }
 }
 
 final class RemoteLiveMarketStreamServiceTests: XCTestCase {
@@ -51,6 +57,16 @@ final class RemoteLiveMarketStreamServiceTests: XCTestCase {
         sut.disconnect()
         
         XCTAssertTrue(client.didDisconnect)
+    }
+    
+    func test_subscribe_sendsCorrectFinnhubJSONPayLoad() async throws {
+        let (sut, client) = makeSUT()
+        
+        try await sut.subscribe(to: "AAPL")
+        
+        XCTAssertEqual(client.sentMessages, [
+            #"{"symbol":"AAPL","type":"subscribe"}"#
+        ])
     }
     
     private func makeSUT(
