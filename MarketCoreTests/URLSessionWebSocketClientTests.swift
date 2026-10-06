@@ -10,13 +10,58 @@ import MarketCore
 
 final class URLSessionWebSocketClient {
     
+    private let session: WebSocketSession
+    private var task: WebSocketTask?
+    
+    private let eventContinuation: AsyncStream<WebSocketEvent>.Continuation
+    public let events: AsyncStream<WebSocketEvent>
+    
     public init(session: WebSocketSession = URLSession.shared) {
+        self.session = session
         
+        var continuation: AsyncStream<WebSocketEvent>.Continuation!
+        self.events = AsyncStream { continuation = $0 }
+        self.eventContinuation = continuation
     }
     
+    func connect(to url: URL) {
+        let task = session.makeWebSocketTask(with: url)
+        self.task = task
+        task.resume()
+        eventContinuation.yield(.connected)
+        
+        startReceiving(from: task)
+    }
+    
+    private func startReceiving(from task: WebSocketTask) {}
+    
+    deinit {
+        eventContinuation.finish()
+    }
 }
 
 final class URLSessionWebSocketClientTests: XCTestCase {
+    
+    func test_init_doesNotCreateTaskOrEmitEvents() {
+        let (_, session) = makeSUT()
+        
+        XCTAssertNil(session.requestedURL)
+        XCTAssertNil(session.createdTask)
+    }
+    
+    func test_connect_createsAndResumesTaskAndEmitsConnected() async {
+        let (sut, session) = makeSUT()
+        let url = anyURL()
+        var iterator = sut.events.makeAsyncIterator()
+        
+        sut.connect(to: url)
+        
+        XCTAssertEqual(session.requestedURL, url)
+        XCTAssertEqual(session.createdTask?.resumeCount, 1)
+        
+        let event = await iterator.next()
+        XCTAssertEqual(event, .connected)
+    }
     
     // MARK: - Helpers
     
@@ -33,12 +78,12 @@ final class URLSessionWebSocketClientTests: XCTestCase {
     
     private final class WebSocketSessionSpy: WebSocketSession, @unchecked Sendable {
         var requestedURL: URL?
-        var createdTasks: WebSocketTask?
+        var createdTask: WebSocketTaskSpy?
         
         func makeWebSocketTask(with url: URL) -> WebSocketTask {
             self.requestedURL = url
             let task = WebSocketTaskSpy()
-            self.createdTasks = task
+            self.createdTask = task
             return task
         }
     }
