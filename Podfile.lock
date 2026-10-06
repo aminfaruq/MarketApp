@@ -1,4 +1,7 @@
 PODS:
+  - IGListDiffKit (5.2.0)
+  - IGListKit (5.2.0):
+    - IGListDiffKit (= 5.2.0)
   - PINCache (3.0.4):
     - PINCache/Arc-exception-safe (= 3.0.4)
     - PINCache/Core (= 3.0.4)
@@ -14,6 +17,16 @@ PODS:
   - PINRemoteImage/PINCache (3.0.4):
     - PINCache (~> 3.0.4)
     - PINRemoteImage/Core
+  - RxBlocking (6.9.0):
+    - RxSwift (= 6.9.0)
+  - RxCocoa (6.9.0):
+    - RxRelay (= 6.9.0)
+    - RxSwift (= 6.9.0)
+  - RxRelay (6.9.0):
+    - RxSwift (= 6.9.0)
+  - RxSwift (6.9.0)
+  - RxTest (6.9.0):
+    - RxSwift (= 6.9.0)
   - Texture (3.2.0):
     - Texture/AssetsLibrary (= 3.2.0)
     - Texture/Core (= 3.2.0)
@@ -36,21 +49,41 @@ PODS:
     - Texture/Core
 
 DEPENDENCIES:
-  - Texture
+  - IGListKit (~> 5.0)
+  - RxBlocking (~> 6.8)
+  - RxCocoa (~> 6.8)
+  - RxRelay (~> 6.8)
+  - RxSwift (~> 6.8)
+  - RxTest (~> 6.8)
+  - Texture (~> 3.1)
 
 SPEC REPOS:
   trunk:
+    - IGListDiffKit
+    - IGListKit
     - PINCache
     - PINOperation
     - PINRemoteImage
+    - RxBlocking
+    - RxCocoa
+    - RxRelay
+    - RxSwift
+    - RxTest
     - Texture
 
 SPEC CHECKSUMS:
+  IGListDiffKit: 33d814e2f318fe75080c527a71bafcc31b6b3abc
+  IGListKit: e43679ba92defb48928d3b27765ac87648f06f25
   PINCache: d9a87a0ff397acffe9e2f0db972ac14680441158
   PINOperation: fb563bcc9c32c26d6c78aaff967d405aa2ee74a7
   PINRemoteImage: 6256a644f4996991f124811763c7286b2a63ff94
+  RxBlocking: 5d2b26d019b6ba9eb3f58638611f124609c44822
+  RxCocoa: ac16414696ae706516be3e1ab00fcce5bdc9be8a
+  RxRelay: 6b0c930e5cef57d5fe2032571e5e65b78e3cbdb1
+  RxSwift: 31649ace6aceeb422e16ff71c60804f9c3281ed9
+  RxTest: fa7749822359a10a19b9fa32b80dbe608e4ce44e
   Texture: 61e86ea2ee124f545be40293b54b5b8986006da2
 
-PODFILE CHECKSUM: 9e83111e0642187fc991ef57ac7fa7c63eb87ff9
+PODFILE CHECKSUM: c154a145787227fe3eaa4e62ee25210fe7e14fd4
 
 COCOAPODS: 1.16.2
