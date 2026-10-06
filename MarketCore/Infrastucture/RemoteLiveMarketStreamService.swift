@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class RemoteLiveMarketStreamService {
+public final class RemoteLiveMarketStreamService: LiveMarketStreamService, @unchecked Sendable {
     
     private let url: URL
     private let client: WebSocketClient
