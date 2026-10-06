@@ -38,7 +38,33 @@ final class URLSessionWebSocketClient {
         startReceiving(from: task)
     }
     
-    private func startReceiving(from task: WebSocketTask) {}
+    private func startReceiving(from task: WebSocketTask) {
+        receiveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    let message = try await task.receive()
+                    guard let self = self else { break }
+                    
+                    switch message {
+                        case .string(let text):
+                            self.eventContinuation.yield(.message(text))
+                        case .data(let data):
+                            if let text = String(data: data, encoding: .utf8) {
+                                self.eventContinuation.yield(.message(text))
+                            }
+                        @unknown default:
+                            break
+                    }
+                } catch {
+                    guard let self = self else { break }
+                    if !Task.isCancelled {
+                        self.eventContinuation.yield(.error(error.localizedDescription))
+                    }
+                    break
+                }
+            }
+        }
+    }
     
     func disconnect() {
         receiveTask?.cancel()
@@ -119,6 +145,46 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         XCTAssertEqual(session.createdTask?.sentMessages, [.string("test message")])
     }
     
+    func test_receiveStringMessage_yieldsMessageEvent() async {
+        let (sut, session) = makeSUT()
+        var iterator = sut.events.makeAsyncIterator()
+        
+        sut.connect(to: anyURL())
+        _ = await iterator.next() // consume .connected
+        
+        session.createdTask?.simulateReceive(.success(.string("hello")))
+        
+        let event = await iterator.next()
+        XCTAssertEqual(event, .message("hello"))
+    }
+    
+    func test_receiveDataMessage_yieldsMessageEvent() async {
+        let (sut, session) = makeSUT()
+        var iterator = sut.events.makeAsyncIterator()
+        
+        sut.connect(to: anyURL())
+        _ = await iterator.next() // consume .connected
+        
+        let data = "hello data".data(using: .utf8)!
+        session.createdTask?.simulateReceive(.success(.data(data)))
+        
+        let event = await iterator.next()
+        XCTAssertEqual(event, .message("hello data"))
+    }
+    
+    func test_receiveError_yieldsErrorEvent() async {
+        let (sut, session) = makeSUT()
+        var iterator = sut.events.makeAsyncIterator()
+        
+        sut.connect(to: anyURL())
+        _ = await iterator.next() // consume .connected
+        
+        session.createdTask?.simulateReceive(.failure(anyNSError()))
+        
+        let event = await iterator.next()
+        XCTAssertEqual(event, .error(anyNSError().localizedDescription))
+    }
+    
     // MARK: - Helpers
     
     private func makeSUT(
@@ -154,7 +220,15 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         var isCancelled = false
         var sentMessages = [SentMessage]()
         
-        private var receiveContinuation: CheckedContinuation<URLSessionWebSocketTask.Message, Swift.Error>?
+        private let incomingContinuation: AsyncStream<Result<URLSessionWebSocketTask.Message, Swift.Error>>.Continuation
+        private var incomingIterator: AsyncStream<Result<URLSessionWebSocketTask.Message, Swift.Error>>.AsyncIterator
+        
+        init() {
+            var cont: AsyncStream<Result<URLSessionWebSocketTask.Message, Swift.Error>>.Continuation!
+            let stream = AsyncStream<Result<URLSessionWebSocketTask.Message, Swift.Error>> { cont = $0 }
+            self.incomingContinuation = cont
+            self.incomingIterator = stream.makeAsyncIterator()
+        }
         
         func resume() {
             resumeCount += 1
@@ -162,35 +236,34 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         
         func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
             isCancelled = true
-            receiveContinuation?.resume(throwing: CancellationError())
-            receiveContinuation = nil
+            incomingContinuation.finish()
         }
         
         func send(_ message: URLSessionWebSocketTask.Message) async throws {
             switch message {
-            case .string(let text):
-                sentMessages.append(.string(text))
-            case .data(let data):
-                sentMessages.append(.data(data))
-            @unknown default:
-                break
+                case .string(let text):
+                    sentMessages.append(.string(text))
+                case .data(let data):
+                    sentMessages.append(.data(data))
+                @unknown default:
+                    break
             }
         }
         
         func receive() async throws -> URLSessionWebSocketTask.Message {
-            return try await withCheckedThrowingContinuation { continuation in
-                self.receiveContinuation = continuation
+            if isCancelled {
+                throw CancellationError()
             }
+            
+            guard let result = await incomingIterator.next() else {
+                throw CancellationError()
+            }
+            
+            return try result.get()
         }
         
         func simulateReceive(_ result: Result<URLSessionWebSocketTask.Message, Swift.Error>) {
-            switch result {
-                case .success(let message):
-                    receiveContinuation?.resume(returning: message)
-                case .failure(let failure):
-                    receiveContinuation?.resume(throwing: failure)
-            }
-            receiveContinuation = nil
+            incomingContinuation.yield(result)
         }
     }
 }
