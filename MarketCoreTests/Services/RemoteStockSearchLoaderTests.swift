@@ -42,12 +42,25 @@ final class RemoteStockSearchLoader {
             throw Error.connectivity
         }
         
-        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RootDTO.self, from: data) else { throw Error.invalidData }
+        guard response.statusCode == 200, let root = try? JSONDecoder().decode(RootDTO.self, from: data) else { throw Error.invalidData }
         
-        return []
+        return root.result.map { $0.toModel() }
     }
     
-    private struct RootDTO: Decodable {}
+    private struct RootDTO: Decodable {
+        let result: [RemoteResultDTO]
+    }
+    
+    private struct RemoteResultDTO: Decodable {
+        let description: String
+        let displaySymbol: String
+        let symbol: String
+        let type: String
+        
+        func toModel() -> SearchResultModel {
+            .init(symbol: symbol, description: description, displaySymbol: displaySymbol, type: type)
+        }
+    }
 }
 
 final class RemoteStockSearchLoaderTests: XCTestCase {
@@ -99,6 +112,28 @@ final class RemoteStockSearchLoaderTests: XCTestCase {
         await assertThat(sut, throws: .invalidData)
     }
     
+    func test_search_deliversEmptyJSONWith200StatusCode() async {
+        let (sut, client) = makeSUT(url: anyURL())
+        let emptyJSON = makeStocks([])
+        client.stub(statusCode: 200, data: emptyJSON)
+        
+        let receivedResult = try? await sut.search(query: anyString())
+        
+        XCTAssertEqual(receivedResult, [])
+    }
+    
+    func test_search_deliversStocksWith200StatusCode() async {
+        let (sut, client) = makeSUT(url: anyURL())
+        let stock1 = makeStock(symbol: "AAPL", description: "APPLE INC", displaySymbol: "AAPL", type: "Common Stock")
+        let stock2 = makeStock(symbol: "AAPL.SW", description: "APPLE INC", displaySymbol: "AAPL.SW", type: "Common Stock")
+        let expectedResult = [stock1.model, stock2.model]
+        let json = makeStocks([stock1.json, stock2.json])
+        client.stub(statusCode: 200, data: json)
+        
+        let receivedResult = try? await sut.search(query: anyString())
+        
+        XCTAssertEqual(receivedResult, expectedResult)
+    }
     
     //MARK: - HELPERS
     private func makeSUT(
@@ -113,6 +148,36 @@ final class RemoteStockSearchLoaderTests: XCTestCase {
         trackForMemoryLeaks(sut, file: file, line: line)
         
         return (sut, client)
+    }
+    
+    private func makeStocks(_ result: [[String: Any]]) -> Data {
+        let json: [String: Any] = [
+            "result": result
+        ]
+        
+        return try! JSONSerialization.data(withJSONObject: json)
+    }
+    
+    private func makeStock(
+        symbol: String,
+        description: String,
+        displaySymbol: String,
+        type: String
+    ) -> (model: SearchResultModel, json: [String: Any]) {
+        let json : [String: Any] = [
+            "description": description,
+            "displaySymbol": displaySymbol,
+            "symbol": symbol,
+            "type": type
+        ]
+        
+        let model = SearchResultModel(
+            symbol: symbol,
+            description: description,
+            displaySymbol: displaySymbol,
+            type: type)
+        
+        return (model, json)
     }
     
     private func assertThat(
