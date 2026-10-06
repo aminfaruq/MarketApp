@@ -110,6 +110,15 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         }
     }
     
+    func test_send_deliversMessageToTask() async throws {
+        let (sut, session) = makeSUT()
+        sut.connect(to: anyURL())
+        
+        try await sut.send(text: "test message")
+        
+        XCTAssertEqual(session.createdTask?.sentMessages, [.string("test message")])
+    }
+    
     // MARK: - Helpers
     
     private func makeSUT(
@@ -136,9 +145,14 @@ final class URLSessionWebSocketClientTests: XCTestCase {
     }
     
     private final class WebSocketTaskSpy: WebSocketTask, @unchecked Sendable {
+        enum SentMessage: Equatable {
+            case string(String)
+            case data(Data)
+        }
+        
         var resumeCount = 0
         var isCancelled = false
-        var sentMessages = [URLSessionWebSocketTask.Message]()
+        var sentMessages = [SentMessage]()
         
         private var receiveContinuation: CheckedContinuation<URLSessionWebSocketTask.Message, Swift.Error>?
         
@@ -153,7 +167,14 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         }
         
         func send(_ message: URLSessionWebSocketTask.Message) async throws {
-            sentMessages.append(message)
+            switch message {
+            case .string(let text):
+                sentMessages.append(.string(text))
+            case .data(let data):
+                sentMessages.append(.data(data))
+            @unknown default:
+                break
+            }
         }
         
         func receive() async throws -> URLSessionWebSocketTask.Message {
@@ -173,3 +194,4 @@ final class URLSessionWebSocketClientTests: XCTestCase {
         }
     }
 }
+
