@@ -7,6 +7,10 @@
 
 // For Realtime Websockets
 public protocol LiveMarketStreamService {
-    func subscribe(to symbol: String)
-    func unsubscribe(from symbol: String)
+    var tradeStream: AsyncStream<LiveTradeModel> { get }
+    
+    func connect()
+    func disconnect()
+    func subscribe(to symbol: String) async throws
+    func unsubscribe(from symbol: String) async throws
 }
