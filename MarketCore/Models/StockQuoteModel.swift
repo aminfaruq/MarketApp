@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct StockQuoteModel: Equatable {
+public struct StockQuoteModel: Equatable, Sendable {
     public let symbol: String
     public let currentPrice: Double
     public let change: Double
