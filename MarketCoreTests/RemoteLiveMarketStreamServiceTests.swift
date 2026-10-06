@@ -13,9 +13,20 @@ final class RemoteLiveMarketStreamService {
     private let url: URL
     private let client: WebSocketClient
     
+    private let streamContinuation: AsyncStream<LiveTradeModel>.Continuation
+    public let tradeStream: AsyncStream<LiveTradeModel>
+    
+    private var listeningTask: Task<Void, Never>?
+    
     init(url: URL, client: WebSocketClient) {
         self.url = url
         self.client = client
+        
+        var continuation: AsyncStream<LiveTradeModel>.Continuation!
+        self.tradeStream = AsyncStream { continuation = $0 }
+        self.streamContinuation = continuation
+        
+        listenToClientEvents()
     }
     
     func connect() {
@@ -36,6 +47,53 @@ final class RemoteLiveMarketStreamService {
         let payload = #"{"symbol":"\#(symbol)","type":"unsubscribe"}"#
         
         try await client.send(text: payload)
+    }
+    
+    private func listenToClientEvents() {
+        listeningTask =  Task { [weak self] in
+            guard let events = self?.client.events else { return }
+
+            for await event in events {
+                guard let self = self else { break }
+                
+                switch event {
+                    case .message(let text):
+                        self.parseAndEmitTrades(from: text)
+                    default:
+                        break
+                }
+            }
+        }
+    }
+    
+    deinit {
+        listeningTask?.cancel()
+        streamContinuation.finish()
+    }
+    
+    private func parseAndEmitTrades(from text: String) {
+        guard let data = text.data(using: .utf8), let response = try? JSONDecoder().decode(FinnhubWebSocketResponseDTO.self, from: data), response.type == "trade", let trades = response.data else { return }
+        
+        for tradeDTO in trades {
+            let model = LiveTradeModel(
+                symbol: tradeDTO.s,
+                price: tradeDTO.p,
+                volume: tradeDTO.v,
+                timestamp: Date(timeIntervalSince1970: tradeDTO.t / 1000.0)
+            )
+            streamContinuation.yield(model)
+        }
+    }
+    
+    private struct FinnhubWebSocketResponseDTO: Decodable {
+        let type: String
+        let data: [FinnhubTradeDTO]?
+    }
+    private struct FinnhubTradeDTO: Decodable {
+        let p: Double // price
+        let s: String // symbol
+        let t: Double // timestamp (milliseconds)
+        let v: Double // volume
     }
 }
 
@@ -85,6 +143,34 @@ final class RemoteLiveMarketStreamServiceTests: XCTestCase {
         ])
     }
     
+    func test_tradeStream_deliversDecodedLiveTrades() async {
+        let (sut, client) = makeSUT()
+        
+        let validJSON = """
+        {
+            "type": "trade",
+            "data": [
+                {
+                    "s": "AAPL",
+                    "p": 178.5,
+                    "t": 1696417200000,
+                    "v": 100
+                }
+            ]
+        }
+        """
+        
+        var iterator = sut.tradeStream.makeAsyncIterator()
+        
+        client.simulateMessage(validJSON)
+        
+        let trade = await iterator.next()
+        
+        XCTAssertEqual(trade?.symbol, "AAPL")
+        XCTAssertEqual(trade?.price, 178.5)
+        XCTAssertEqual(trade?.timestamp, Date(timeIntervalSince1970: 1696417200))
+    }
+    
     private func makeSUT(
         url: URL = URL(string: "wss://any-url.com")!,
         file: StaticString = #filePath,
@@ -102,22 +188,23 @@ final class RemoteLiveMarketStreamServiceTests: XCTestCase {
         var didDisconnect = false
         var sentMessages = [String]()
         
-        private var continuation: AsyncStream<WebSocketEvent>.Continuation?
+        private let continuation: AsyncStream<WebSocketEvent>.Continuation
+        let events: AsyncStream<WebSocketEvent>
         
-        lazy var events: AsyncStream<WebSocketEvent> = {
-            AsyncStream { continuation in
-                self.continuation = continuation
-            }
-        }()
+        init() {
+            var cont: AsyncStream<WebSocketEvent>.Continuation!
+            self.events = AsyncStream { cont = $0 }
+            self.continuation = cont
+        }
         
         func connect(to url: URL) {
             connectedURL = url
-            continuation?.yield(.connected)
+            continuation.yield(.connected)
         }
         
         func disconnect() {
             didDisconnect = true
-            continuation?.yield(.disconnected)
+            continuation.yield(.disconnected)
         }
         
         func send(text: String) async throws {
@@ -125,7 +212,7 @@ final class RemoteLiveMarketStreamServiceTests: XCTestCase {
         }
         
         func simulateMessage(_ message: String) {
-            continuation?.yield(.message(message))
+            continuation.yield(.message(message))
         }
     }
     
