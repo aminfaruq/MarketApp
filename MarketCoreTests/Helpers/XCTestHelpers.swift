@@ -30,3 +30,7 @@ func anyData() -> Data {
 func anyNSError() -> NSError {
     NSError(domain: "any-error-domain", code: 0)
 }
+
+func anyToken() -> String {
+    "423535"
+}
