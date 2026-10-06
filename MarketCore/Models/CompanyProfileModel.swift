@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct CompanyProfileModel: Equatable {
+public struct CompanyProfileModel: Equatable, Sendable {
     public let symbol: String
     public let name: String
     public let logoURL: URL?
