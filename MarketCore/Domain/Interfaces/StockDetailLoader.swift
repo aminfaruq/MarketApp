@@ -6,9 +6,9 @@
 //
 
 public protocol StockDetailLoader {
-    /// GET https://finnhub.io/stock/profile2?symbol={symbol}
+    /// GET https://finnhub.io/api/v1/stock/profile2?symbol={symbol}
     func loadProfile(symbol: String) async throws -> CompanyProfileModel
     
-    /// GET https://finnhub.io/quote?symbol={symbol}
+    /// GET  https://finnhub.io/api/v1/quote?symbol={symbol}
     func loadQuote(symbol: String) async throws -> StockQuoteModel
 }
