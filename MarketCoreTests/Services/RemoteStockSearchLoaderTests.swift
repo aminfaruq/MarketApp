@@ -10,6 +10,11 @@ import MarketCore
 
 final class RemoteStockSearchLoader {
     
+    enum Error: Swift.Error, LocalizedError, Equatable {
+        case connectivity
+        case invalidData
+    }
+    
     private let client: HTTPClient
     private let url: URL
     private let token: String
@@ -28,10 +33,21 @@ final class RemoteStockSearchLoader {
         
         let requestURL = url.appendingQueryItems(queryItems)
         
-        _ = try? await client.get(from: requestURL)
+        let response: HTTPURLResponse
+        let data: Data
+        
+        do {
+            (data, response) = try await client.get(from: requestURL)
+        } catch {
+            throw Error.connectivity
+        }
+        
+        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RootDTO.self, from: data) else { throw Error.invalidData }
         
         return []
     }
+    
+    private struct RootDTO: Decodable {}
 }
 
 final class RemoteStockSearchLoaderTests: XCTestCase {
@@ -58,6 +74,31 @@ final class RemoteStockSearchLoaderTests: XCTestCase {
         XCTAssertEqual(client.requestedURLs.first?.query, "q=\(query)&token=\(token)")
     }
     
+    func test_search_deliversErrorConnectivity() async {
+        let (sut, client) = makeSUT(url: anyURL())
+        client.stub(with: .failure(anyNSError()))
+        
+        await assertThat(sut, throws: .connectivity)
+    }
+    
+    func test_search_deliversInvalidDataOnNon200StatusCode() async {
+        let samples = [199, 201, 300, 400, 500]
+        
+        for code in samples {
+            let (sut, client) = makeSUT(url: anyURL())
+            client.stub(statusCode: code, data: anyData())
+            
+            await assertThat(sut, throws: .invalidData)
+        }
+    }
+    
+    func test_search_deliversInvalidData200StatusCodeWithInvalidJSON() async {
+        let (sut, client) = makeSUT(url: anyURL())
+        client.stub(statusCode: 200, data: Data("invalid json".utf8))
+        
+        await assertThat(sut, throws: .invalidData)
+    }
+    
     
     //MARK: - HELPERS
     private func makeSUT(
@@ -72,6 +113,23 @@ final class RemoteStockSearchLoaderTests: XCTestCase {
         trackForMemoryLeaks(sut, file: file, line: line)
         
         return (sut, client)
+    }
+    
+    private func assertThat(
+        _ sut: RemoteStockSearchLoader,
+        throws expectedError: RemoteStockSearchLoader.Error,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        do {
+            _ = try await sut.search(query: anyString())
+            XCTFail("Expected \(expectedError), got success", file: file, line: line)
+        } catch let error as RemoteStockSearchLoader.Error {
+            XCTAssertEqual(error, expectedError, file: file, line: line)
+            XCTAssertNotNil(error.localizedDescription, file: file, line: line)
+        } catch {
+            XCTFail("Expected \(expectedError), got failure \(error)", file: file, line: line)
+        }
     }
     
     private class HTTPClientSpy: HTTPClient {
