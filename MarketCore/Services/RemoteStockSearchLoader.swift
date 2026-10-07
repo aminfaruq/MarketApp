@@ -24,11 +24,11 @@ public final class RemoteStockSearchLoader: StockSearchLoader, @unchecked Sendab
     }
     
     private let client: HTTPClient
-    private let url: URL
+    private let baseURL: URL
     private let token: String
     
-    public init(url: URL, token: String, client: HTTPClient) {
-        self.url = url
+    public init(baseURL: URL, token: String, client: HTTPClient) {
+        self.baseURL = baseURL
         self.token = token
         self.client = client
     }
@@ -39,7 +39,9 @@ public final class RemoteStockSearchLoader: StockSearchLoader, @unchecked Sendab
             URLQueryItem(name: "token", value: token)
         ]
         
-        let requestURL = url.appendingQueryItems(queryItems)
+        let requestURL = baseURL
+            .appendingPathComponent("search")
+            .appendingQueryItems(queryItems)
         
         let response: HTTPURLResponse
         let data: Data
