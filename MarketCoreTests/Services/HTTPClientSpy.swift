@@ -9,27 +9,35 @@ import Foundation
 import MarketCore
 
 class HTTPClientSpy: HTTPClient {
-    var requestedURLs = [URL]()
+    private let lock = NSLock()
+    private var _requestedURLs = [URL]()
+    
+    var requestedURLs: [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _requestedURLs
+    }
+    
     private var stub: Result<HTTPClient.Result, Error>?
     
     func stub(with result: Result<HTTPClient.Result, Error>) {
+        lock.lock()
+        defer { lock.unlock() }
         stub = result
     }
     
     func stub(statusCode: Int, data: Data) {
         let response = HTTPURLResponse(url: anyURL(), statusCode: statusCode, httpVersion: nil, headerFields: nil)!
-        stub = .success((data, response))
+        stub(with: .success((data, response)))
     }
     
     func get(from url: URL) async throws -> HTTPClient.Result {
-        requestedURLs.append(url)
+        let currentStub = lock.withLock {
+            _requestedURLs.append(url)
+            return stub
+        }
         
-        let response = HTTPURLResponse(
-            url: anyURL(),
-            statusCode: 200,
-            httpVersion: nil,
-            headerFields: nil
-        )!
-        return try stub?.get() ?? (anyData(), response)
+        let response = HTTPURLResponse(url: anyURL(), statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return try currentStub?.get() ?? (anyData(), response)
     }
 }
