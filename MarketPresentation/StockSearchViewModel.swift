@@ -48,7 +48,14 @@ public final class StockSearchViewModel: ViewModelType {
     public func transform(input: Input) -> Output {
         let items = input.searchTrigger
             .flatMapLatest { [loader] query -> Observable<[SearchResultItemViewModel]> in
-                Observable.create { observer in
+                
+                let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                guard !trimmed.isEmpty else {
+                    return .just([])
+                }
+                
+                return Observable.create { observer in
                     let task = Task {
                         do {
                             let models = try await loader.search(query: query)
