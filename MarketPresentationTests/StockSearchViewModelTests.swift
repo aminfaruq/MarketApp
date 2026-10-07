@@ -111,6 +111,32 @@ final class StockSearchViewModelTests: XCTestCase {
         XCTAssertEqual(receivedLoadingStates, [false, true, false])
     }
     
+    func test_search_deliversErrorMessageOnLoaderFailure() async {
+        let (sut, loader) = makeSUT()
+        loader.stub(with: .failure(anyNSError()))
+        
+        let searchTrigger = PublishSubject<String>()
+        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
+        
+        var receivedErrors = [String?]()
+        let disposeBag = DisposeBag()
+        let exp = expectation(description: "Wait for error")
+        
+        output.errorMessage
+            .subscribe(onNext: { error in
+                receivedErrors.append(error)
+                exp.fulfill()
+            })
+            .disposed(by: disposeBag)
+        
+        output.items.subscribe().disposed(by: disposeBag)
+        
+        searchTrigger.onNext("AAPL")
+        await fulfillment(of: [exp], timeout: 1.0)
+        
+        XCTAssertEqual(receivedErrors, ["Failed to search. Try again later."])
+    }
+    
     // MARK: - Helpers
     private func makeSUT(file: StaticString = #filePath, line: UInt = #line) -> (sut: StockSearchViewModel, loader: StockSearchLoaderSpy) {
         let loader = StockSearchLoaderSpy()
