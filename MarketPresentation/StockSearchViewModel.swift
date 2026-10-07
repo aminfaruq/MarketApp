@@ -48,10 +48,29 @@ public final class StockSearchViewModel: ViewModelType {
     public func transform(input: Input) -> Output {
         let items = input.searchTrigger
             .flatMapLatest { [loader] query -> Observable<[SearchResultItemViewModel]> in
-                Task {
-                    _ = try? await loader.search(query: query)
+                Observable.create { observer in
+                    let task = Task {
+                        do {
+                            let models = try await loader.search(query: query)
+                            let viewModels = models.map {
+                                SearchResultItemViewModel(
+                                    symbol: $0.symbol,
+                                    companyName: $0.description,
+                                    type: $0.type
+                                )
+                            }
+                            observer.onNext(viewModels)
+                            observer.onCompleted()
+                        } catch {
+                            observer.onNext([])
+                            observer.onCompleted()
+                        }
+                    }
+                    
+                    return Disposables.create {
+                        task.cancel()
+                    }
                 }
-                return .just([])
             }
         
         return Output(items: items)
