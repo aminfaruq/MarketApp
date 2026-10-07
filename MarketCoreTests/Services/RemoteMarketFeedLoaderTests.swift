@@ -48,6 +48,55 @@ final class RemoteMarketFeedLoader {
         return root.map({ $0.toModel() })
     }
     
+    func loadQuotes(symbols: [String]) async throws -> [StockQuoteModel] {
+        guard !symbols.isEmpty else { return [] }
+        
+        return try await withThrowingTaskGroup(of: StockQuoteModel.self) { group in
+            for symbol in symbols {
+                group.addTask {
+                    try await self.loadSingleQuote(symbol: symbol)
+                }
+            }
+            
+            var quotes = [StockQuoteModel]()
+            for try await quote in group {
+                quotes.append(quote)
+            }
+            
+            let symbolOrder = Dictionary(uniqueKeysWithValues: symbols.enumerated().map { ($1 , $0) })
+            return quotes.sorted {
+                (symbolOrder[$0.symbol] ?? 0) < (symbolOrder[$1.symbol] ?? 0)
+            }
+        }
+        
+    }
+    
+    private func loadSingleQuote(symbol: String) async throws -> StockQuoteModel {
+        let queryItems = [
+            URLQueryItem(name: "symbol", value: symbol),
+            URLQueryItem(name: "token", value: token)
+        ]
+        let requestURL = baseURL
+            .appendingPathComponent("quote")
+            .appendingQueryItems(queryItems)
+        
+        let response: HTTPURLResponse
+        let data: Data
+        
+        do {
+            (data, response) = try await client.get(from: requestURL)
+        } catch {
+            throw Error.connectivity
+        }
+        
+        guard response.statusCode == 200,
+              let root = try? JSONDecoder().decode(RemoteStockQuoteDTO.self, from: data) else {
+            throw Error.invalidData
+        }
+        
+        return root.toModel(symbol: symbol)
+    }
+    
     private struct RemoteMarketFeedDTO: Decodable {
         let datetime: Double
         let headline: String
@@ -69,6 +118,32 @@ final class RemoteMarketFeedLoader {
             )
         }
     }
+    
+    private struct RemoteStockQuoteDTO: Decodable {
+        let c: Double
+        let d: Double
+        let dp: Double
+        let h: Double
+        let l: Double
+        let o: Double
+        let pc: Double
+        let t: Double
+        
+        func toModel(symbol: String) -> StockQuoteModel {
+            .init(
+                symbol: symbol,
+                currentPrice: c,
+                change: d,
+                percentChange: dp,
+                highPrice: h,
+                lowPrice: l,
+                openPrice: o,
+                previousClose: pc,
+                timestamp: Date(timeIntervalSince1970: t)
+            )
+        }
+    }
+    
 }
 
 final class RemoteMarketFeedLoaderTests: XCTestCase {
@@ -79,6 +154,7 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
         XCTAssertTrue(spy.requestedURLs.isEmpty)
     }
     
+    // MARK: - Market news
     func test_loadMarketNews_requestsDataFromURL() async {
         let token = anyToken()
         let url = anyURL()
@@ -148,6 +224,67 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
         XCTAssertEqual(receivedResult, [market.model])
     }
     
+    // MARK: - Quotes
+    func test_loadQuotes_withEmptySymbols_doesNotRequestNetwork() async throws {
+        let (sut, spy) = makeSUT()
+        
+        let result = try await sut.loadQuotes(symbols: [])
+        
+        XCTAssertTrue(spy.requestedURLs.isEmpty)
+        XCTAssertEqual(result, [])
+    }
+    
+    func test_loadQuotes_requestsDataFromURLForEachSymbol() async {
+        let symbols = ["AAPL", "GOOG"]
+        let token = anyToken()
+        let url = anyURL()
+        let (sut, spy) = makeSUT(url: url, token: token)
+        
+        let expectedURLs = symbols.map { symbol in
+            url.appendingPathComponent("quote")
+                .appendingQueryItems([
+                    URLQueryItem(name: "symbol", value: symbol),
+                    URLQueryItem(name: "token", value: token)
+                ])
+        }
+        
+        _ = try? await sut.loadQuotes(symbols: symbols)
+        
+        XCTAssertEqual(Set(spy.requestedURLs), Set(expectedURLs))
+    }
+    
+    func test_loadQuotes_deliversErrorConnectivity() async {
+        let (sut, spy) = makeSUT()
+        spy.stub(with: .failure(anyNSError()))
+        
+        await assertThat({
+            _ = try await sut.loadQuotes(symbols: ["AAPL"])
+        }, throws: .connectivity)
+    }
+    
+    func test_loadQuotes_deliversErrorInvalidDataOnNon200StatusCode() async {
+        let samples = [199, 201, 300, 400, 500]
+        let (sut, spy) = makeSUT()
+        
+        for code in samples {
+            spy.stub(statusCode: code, data: anyData())
+            
+            await assertThat({
+                _ = try await sut.loadQuotes(symbols: ["AAPL"])
+            }, throws: .invalidData)
+        }
+    }
+    
+    func test_loadQuotes_deliversQuotesOn200StatusCode() async throws {
+        let (sut, spy) = makeSUT()
+        let quote = makeQuote(symbol: "AAPL")
+        let data = try! JSONSerialization.data(withJSONObject: quote.json)
+        spy.stub(statusCode: 200, data: data)
+        
+        let receivedQuotes = try await sut.loadQuotes(symbols: ["AAPL"])
+        
+        XCTAssertEqual(receivedQuotes, [quote.model])
+    }
     
     // MARK: - Helpers
     private func makeSUT(
@@ -191,6 +328,41 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
             "url": newsURL.absoluteString
         ]
         
+        return (model, json)
+    }
+    
+    private func makeQuote(
+        symbol: String = "AAPL",
+        currentPrice: Double = 150.0,
+        change: Double = 2.5,
+        percentChange: Double = 1.2,
+        highPrice: Double = 155.0,
+        lowPrice: Double = 148.0,
+        openPrice: Double = 149.0,
+        previousClose: Double = 147.5,
+        timestamp: Double = 1696417200
+    ) -> (model: StockQuoteModel, json: [String: Any]) {
+        let model = StockQuoteModel(
+            symbol: symbol,
+            currentPrice: currentPrice,
+            change: change,
+            percentChange: percentChange,
+            highPrice: highPrice,
+            lowPrice: lowPrice,
+            openPrice: openPrice,
+            previousClose: previousClose,
+            timestamp: Date(timeIntervalSince1970: timestamp)
+        )
+        let json: [String: Any] = [
+            "c": currentPrice,
+            "d": change,
+            "dp": percentChange,
+            "h": highPrice,
+            "l": lowPrice,
+            "o": openPrice,
+            "pc": previousClose,
+            "t": timestamp
+        ]
         return (model, json)
     }
     
