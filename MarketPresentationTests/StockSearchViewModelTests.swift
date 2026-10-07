@@ -84,6 +84,33 @@ final class StockSearchViewModelTests: XCTestCase {
           XCTAssertEqual(receivedItems, [[]], "Should returnd empty array")
     }
     
+    func test_search_deliversLoadingState() async {
+        let (sut, _) = makeSUT()
+        let searchTrigger = PublishSubject<String>()
+        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
+        
+        var receivedLoadingStates = [Bool]()
+        let disposeBag = DisposeBag()
+        let exp = expectation(description: "Wait for loading")
+        
+        output.isLoading
+            .subscribe(onNext: { isLoading in
+                receivedLoadingStates.append(isLoading)
+                
+                if !isLoading && receivedLoadingStates.count == 3 {
+                    exp.fulfill()
+                }
+            })
+            .disposed(by: disposeBag)
+        
+        output.items.subscribe().disposed(by: disposeBag)
+        
+        searchTrigger.onNext("AAPL")
+        await fulfillment(of: [exp], timeout: 1.0)
+        
+        XCTAssertEqual(receivedLoadingStates, [false, true, false])
+    }
+    
     // MARK: - Helpers
     private func makeSUT(file: StaticString = #filePath, line: UInt = #line) -> (sut: StockSearchViewModel, loader: StockSearchLoaderSpy) {
         let loader = StockSearchLoaderSpy()
