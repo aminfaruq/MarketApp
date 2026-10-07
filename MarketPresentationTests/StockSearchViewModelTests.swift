@@ -61,6 +61,29 @@ final class StockSearchViewModelTests: XCTestCase {
         XCTAssertEqual(receivedItems, [[stock.viewModel]])
     }
     
+    func test_search_withEmptyOrWhitespaceQuery_doesNotCallLoaderAndClearsItems() async {
+        let (sut, loader) = makeSUT()
+        let searchTrigger = PublishSubject<String>()
+        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObserver()))
+        
+        var receivedItems = [[SearchResultItemViewModel]]()
+        let disposeBag = DisposeBag()
+        let exp = expectation(description: "Wait output to remove list")
+        
+        output.items
+            .subscribe(onNext: { items in
+                receivedItems.append(items)
+                exp.fulfill()
+            })
+            .disposed(by: disposeBag)
+        
+        searchTrigger.onNext("  ")
+        await fulfillment(of: [exp], timeout: 1.0)
+        
+        XCTAssertTrue(loader.receivedQueries.isEmpty, "Loader Shouldn't called when query is empty or space")
+          XCTAssertEqual(receivedItems, [[]], "Should returnd empty array")
+    }
+    
     // MARK: - Helpers
     private func makeSUT(file: StaticString = #filePath, line: UInt = #line) -> (sut: StockSearchViewModel, loader: StockSearchLoaderSpy) {
         let loader = StockSearchLoaderSpy()
