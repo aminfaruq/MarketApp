@@ -27,7 +27,6 @@ final class RemoteMarketFeedLoader {
     }
     
     func loadMarketNews() async throws -> [MarketNewsModel] {
-        
         let url = baseURL
             .appendingPathComponent("news")
             .appending(queryItems: [
@@ -44,12 +43,32 @@ final class RemoteMarketFeedLoader {
             throw Error.connectivity
         }
         
-        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RemoteMarketFeedDTO.self, from: data) else { throw Error.invalidData }
+        guard response.statusCode == 200, let root = try? JSONDecoder().decode([RemoteMarketFeedDTO].self, from: data) else { throw Error.invalidData }
         
-        return []
+        return root.map({ $0.toModel() })
     }
     
-    private struct RemoteMarketFeedDTO: Decodable {}
+    private struct RemoteMarketFeedDTO: Decodable {
+        let datetime: Double
+        let headline: String
+        let id: Int
+        let image: String
+        let source: String
+        let summary: String
+        let url: String
+        
+        func toModel() -> MarketNewsModel {
+            .init(
+                id: id,
+                headline: headline,
+                summary: summary,
+                source: source,
+                imageURL: URL(string: image),
+                newsURL: URL(string: url),
+                publishedAt: Date(timeIntervalSince1970: datetime)
+            )
+        }
+    }
 }
 
 final class RemoteMarketFeedLoaderTests: XCTestCase {
@@ -108,6 +127,27 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
         }, throws: .invalidData)
     }
     
+    func test_loadMarketNews_deliversEmptyWith200StatusCode() async throws {
+        let (sut, spy) = makeSUT()
+        let empty = try! JSONSerialization.data(withJSONObject: [[String: Any]]())
+        spy.stub(statusCode: 200, data: empty)
+        
+        let receivedResult = try await sut.loadMarketNews()
+        
+        XCTAssertEqual(receivedResult, [])
+    }
+    
+    func test_loadMarketNews_deliversDataOn200StatusCode() async throws {
+        let (sut, spy) = makeSUT()
+        let market = makeMarket()
+        let data = try! JSONSerialization.data(withJSONObject: [market.json])
+        spy.stub(statusCode: 200, data: data)
+        
+        let receivedResult = try await sut.loadMarketNews()
+        
+        XCTAssertEqual(receivedResult, [market.model])
+    }
+    
     
     // MARK: - Helpers
     private func makeSUT(
@@ -121,6 +161,37 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
         trackForMemoryLeaks(client, file: file, line: line)
         trackForMemoryLeaks(sut, file: file, line: line)
         return (sut, client)
+    }
+    
+    private func makeMarket(
+        id: Int = 0,
+        headline: String = "a string",
+        summary: String = "a string",
+        source: String = "a string",
+        imageURL: URL = anyURL(),
+        newsURL: URL = anyURL(),
+        publishedAt: Double = 1596589501
+    ) -> (model: MarketNewsModel, json: [String : Any]) {
+        let model = MarketNewsModel(
+            id: id,
+            headline: headline,
+            summary: summary,
+            source: source,
+            imageURL: imageURL,
+            newsURL: newsURL,
+            publishedAt: Date(timeIntervalSince1970: publishedAt)
+        )
+        let json: [String: Any] = [
+            "datetime": publishedAt,
+            "headline": headline,
+            "id": id,
+            "image": imageURL.absoluteString,
+            "source": source,
+            "summary": summary,
+            "url": newsURL.absoluteString
+        ]
+        
+        return (model, json)
     }
     
     private func assertThat(
