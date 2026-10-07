@@ -8,6 +8,7 @@
 import RxSwift
 import Foundation
 import MarketCore
+import RxRelay
 
 public struct SearchResultItemViewModel: Equatable {
     public let symbol: String
@@ -33,9 +34,14 @@ public final class StockSearchViewModel: ViewModelType {
     
     public struct Output {
         public let items: Observable<[SearchResultItemViewModel]>
+        public let isLoading: Observable<Bool>
         
-        public init(items: Observable<[SearchResultItemViewModel]>) {
+        public init(
+            items: Observable<[SearchResultItemViewModel]>,
+            isLoading: Observable<Bool>
+        ) {
             self.items = items
+            self.isLoading = isLoading
         }
     }
     
@@ -46,6 +52,8 @@ public final class StockSearchViewModel: ViewModelType {
     }
     
     public func transform(input: Input) -> Output {
+        let isLoadingRelay = BehaviorRelay<Bool>(value: false)
+        
         let items = input.searchTrigger
             .flatMapLatest { [loader] query -> Observable<[SearchResultItemViewModel]> in
                 
@@ -54,6 +62,8 @@ public final class StockSearchViewModel: ViewModelType {
                 guard !trimmed.isEmpty else {
                     return .just([])
                 }
+                
+                isLoadingRelay.accept(true)
                 
                 return Observable.create { observer in
                     let task = Task {
@@ -66,9 +76,12 @@ public final class StockSearchViewModel: ViewModelType {
                                     type: $0.type
                                 )
                             }
+                            
+                            isLoadingRelay.accept(false)
                             observer.onNext(viewModels)
                             observer.onCompleted()
                         } catch {
+                            isLoadingRelay.accept(false)
                             observer.onNext([])
                             observer.onCompleted()
                         }
@@ -80,7 +93,10 @@ public final class StockSearchViewModel: ViewModelType {
                 }
             }
         
-        return Output(items: items)
+        return Output(
+            items: items,
+            isLoading: isLoadingRelay.asObservable()
+        )
     }
     
 }
