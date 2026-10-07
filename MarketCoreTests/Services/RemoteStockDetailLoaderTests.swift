@@ -71,10 +71,10 @@ final class RemoteStockDetailLoader {
             throw Error.connectivity
         }
         
-        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RemoteStockQuoteDTO.self, from: data) else { throw Error.invalidData }
+        guard response.statusCode == 200, let root = try? JSONDecoder().decode(RemoteStockQuoteDTO.self, from: data) else { throw Error.invalidData }
         
         
-        return .init(symbol: symbol, currentPrice: 0, change: 0, percentChange: 0, highPrice: 0, lowPrice: 0, openPrice: 0, previousClose: 0, timestamp: Date())
+        return root.toModel(symbol: symbol)
     }
     
     private struct RemoteProfileDTO: Decodable {
@@ -98,7 +98,28 @@ final class RemoteStockDetailLoader {
     }
     
     private struct RemoteStockQuoteDTO: Decodable {
+        let c: Double
+        let d: Double
+        let dp: Double
+        let h: Double
+        let l: Double
+        let o: Double
+        let pc: Double
+        let t: Double
         
+        func toModel(symbol: String) -> StockQuoteModel{
+            .init(
+                symbol: symbol,
+                currentPrice: c,
+                change: d,
+                percentChange: dp,
+                highPrice: h,
+                lowPrice: l,
+                openPrice: o,
+                previousClose: pc,
+                timestamp: Date(timeIntervalSince1970: t / 1000.0)
+            )
+        }
     }
 }
 
@@ -157,7 +178,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         let query = "AAPL"
         let profile = makeProfile(symbol: "AAPL", name: "Apple Inc")
         
-        let validJSONData = makeProfileData(profile.json)
+        let validJSONData = makeResultData(profile.json)
         spy.stub(statusCode: 200, data: validJSONData)
         
         let receivedProfile = try await sut.loadProfile(symbol: query)
@@ -185,7 +206,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
     func test_loadQuote_deliversErrorConnectivity() async {
         let (sut, client) = makeSUT(url: anyURL())
         client.stub(with: .failure(anyNSError()))
-                
+        
         await assertThat({ try await sut.loadQuote(symbol: anyString()) }, throws: .connectivity)
     }
     
@@ -207,6 +228,18 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         await assertThat({ try await sut.loadQuote(symbol: anyString()) }, throws: .invalidData)
     }
     
+    func test_loadQuote_deliversQuoteOn200StatusCodeWithValidJSON() async throws {
+        let (sut, spy) = makeSUT()
+        let query = "AAPL"
+        let quote = makeQuote(symbol: query)
+        
+        let validJSONData = makeResultData(quote.json)
+        spy.stub(statusCode: 200, data: validJSONData)
+        
+        let receivedQuote = try await sut.loadQuote(symbol: query)
+        
+        XCTAssertEqual(receivedQuote, quote.model)
+    }
     
     //MARK: - HELPERS
     private func makeSUT(
@@ -240,7 +273,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         }
     }
     
-    private func makeProfileData(_ json: [String: Any]) -> Data {
+    private func makeResultData(_ json: [String: Any]) -> Data {
         return try! JSONSerialization.data(withJSONObject: json)
     }
     
@@ -271,6 +304,41 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
             "finnhubIndustry": industry,
         ]
         
+        return (model, json)
+    }
+    
+    private func makeQuote(
+        symbol: String = anyString(),
+        currentPrice: Double = 178.5,
+        change: Double = 2.5,
+        percentChange: Double = 1.42,
+        highPrice: Double = 180.0,
+        lowPrice: Double = 176.5,
+        openPrice: Double = 177.0,
+        previousClose: Double = 176.0,
+        timestamp: Double = 1696417200
+    ) -> (model: StockQuoteModel, json: [String: Any]) {
+        let json: [String: Any] = [
+            "c": currentPrice,
+            "d": change,
+            "dp": percentChange,
+            "h": highPrice,
+            "l": lowPrice,
+            "o": openPrice,
+            "pc": previousClose,
+            "t": timestamp
+        ]
+        let model = StockQuoteModel(
+            symbol: symbol,
+            currentPrice: currentPrice,
+            change: change,
+            percentChange: percentChange,
+            highPrice: highPrice,
+            lowPrice: lowPrice,
+            openPrice: openPrice,
+            previousClose: previousClose,
+            timestamp: Date(timeIntervalSince1970: timestamp / 1000.0)
+        )
         return (model, json)
     }
 }
