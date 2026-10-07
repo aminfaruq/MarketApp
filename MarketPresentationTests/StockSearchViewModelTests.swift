@@ -137,6 +137,28 @@ final class StockSearchViewModelTests: XCTestCase {
         XCTAssertEqual(receivedErrors, ["Failed to search. Try again later."])
     }
     
+    func test_search_doesNotRequestSearchOnDuplicateQuery() async {
+        let (sut, loader) = makeSUT()
+        let searchTrigger = PublishSubject<String>()
+        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
+        
+        let disposeBag = DisposeBag()
+        let exp = expectation(description: "Wait for first search")
+        
+        output.items
+            .subscribe(onNext: { _ in
+                exp.fulfill()
+            })
+            .disposed(by: disposeBag)
+        
+        searchTrigger.onNext("AAPL")
+        await fulfillment(of: [exp], timeout: 1.0)
+        
+        searchTrigger.onNext("AAPL")
+        
+        XCTAssertEqual(loader.receivedQueries, ["AAPL"])
+    }
+    
     // MARK: - Helpers
     private func makeSUT(file: StaticString = #filePath, line: UInt = #line) -> (sut: StockSearchViewModel, loader: StockSearchLoaderSpy) {
         let loader = StockSearchLoaderSpy()
