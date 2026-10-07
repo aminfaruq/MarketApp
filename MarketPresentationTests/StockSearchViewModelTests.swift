@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import RxSwift
 import MarketCore
 import MarketPresentation
 
@@ -15,6 +16,19 @@ final class StockSearchViewModelTests: XCTestCase {
         let (_, loader) = makeSUT()
         
         XCTAssertTrue(loader.receivedQueries.isEmpty)
+    }
+    
+    func test_search_requestSearchFromLoader() {
+        let (sut, loader) = makeSUT()
+        let searchTrigger = PublishSubject<String>()
+        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
+        
+        let disposeBag = DisposeBag()
+        output.items.subscribe().disposed(by: disposeBag)
+        
+        searchTrigger.onNext("AAPL")
+        
+        XCTAssertEqual(loader.receivedQueries, ["AAPL"])
     }
     
     // MARK: - Helpers
