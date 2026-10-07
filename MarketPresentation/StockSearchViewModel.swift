@@ -35,13 +35,16 @@ public final class StockSearchViewModel: ViewModelType {
     public struct Output {
         public let items: Observable<[SearchResultItemViewModel]>
         public let isLoading: Observable<Bool>
+        public let errorMessage: Observable<String>
         
         public init(
             items: Observable<[SearchResultItemViewModel]>,
-            isLoading: Observable<Bool>
+            isLoading: Observable<Bool>,
+            errorMessage: Observable<String>
         ) {
             self.items = items
             self.isLoading = isLoading
+            self.errorMessage = errorMessage
         }
     }
     
@@ -53,6 +56,7 @@ public final class StockSearchViewModel: ViewModelType {
     
     public func transform(input: Input) -> Output {
         let isLoadingRelay = BehaviorRelay<Bool>(value: false)
+        let errorRelay = PublishRelay<String>()
         
         let items = input.searchTrigger
             .flatMapLatest { [loader] query -> Observable<[SearchResultItemViewModel]> in
@@ -81,6 +85,7 @@ public final class StockSearchViewModel: ViewModelType {
                             observer.onNext(viewModels)
                             observer.onCompleted()
                         } catch {
+                            errorRelay.accept("Failed to search. Try again later.")
                             isLoadingRelay.accept(false)
                             observer.onNext([])
                             observer.onCompleted()
@@ -95,7 +100,8 @@ public final class StockSearchViewModel: ViewModelType {
         
         return Output(
             items: items,
-            isLoading: isLoadingRelay.asObservable()
+            isLoading: isLoadingRelay.asObservable(),
+            errorMessage: errorRelay.asObservable()
         )
     }
     
