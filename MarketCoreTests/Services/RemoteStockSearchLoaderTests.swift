@@ -20,10 +20,12 @@ final class RemoteStockSearchLoaderTests: XCTestCase {
         let query = "AAPL"
         let url = anyURL()
         let token = anyToken()
-        let expectedURL = url.appendingQueryItems([
-            URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "token", value: token)
-        ])
+        let expectedURL = url
+            .appendingPathComponent("search")
+            .appendingQueryItems([
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "token", value: token)
+            ])
         let (sut, client) = makeSUT(url: url)
         
         _ = try? await sut.search(query: query)
@@ -88,7 +90,7 @@ final class RemoteStockSearchLoaderTests: XCTestCase {
         line: UInt = #line
     ) -> (sut: RemoteStockSearchLoader, client: HTTPClientSpy){
         let client = HTTPClientSpy()
-        let sut = RemoteStockSearchLoader(url: url, token: token, client: client)
+        let sut = RemoteStockSearchLoader(baseURL: url, token: token, client: client)
         trackForMemoryLeaks(client, file: file, line: line)
         trackForMemoryLeaks(sut, file: file, line: line)
         
