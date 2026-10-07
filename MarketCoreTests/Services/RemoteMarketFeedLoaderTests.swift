@@ -9,11 +9,20 @@
 import XCTest
 import MarketCore
 
-final class RemoteMarketFeedLoader {
+final class RemoteMarketFeedLoader: MarketFeedLoader , @unchecked Sendable {
     
     enum Error: Swift.Error, LocalizedError, Equatable {
         case connectivity
         case invalidData
+        
+        public var errorDescription: String? {
+            switch self {
+                case .connectivity:
+                    return "Cannot connect to the server. Check your internet connection."
+                case .invalidData:
+                    return "The server returned an unexpected response."
+            }
+        }
     }
     
     private let baseURL: URL
