@@ -11,6 +11,11 @@ import MarketCore
 
 final class RemoteMarketFeedLoader {
     
+    enum Error: Swift.Error, LocalizedError, Equatable {
+        case connectivity
+        case invalidData
+    }
+    
     private let baseURL: URL
     private let client: HTTPClient
     private let token: String
@@ -29,10 +34,22 @@ final class RemoteMarketFeedLoader {
                 URLQueryItem(name: "category", value: "general"),
                 URLQueryItem(name: "token", value: token),
             ])
-        _ = try? await client.get(from: url)
+        
+        let response: HTTPURLResponse
+        let data: Data
+        
+        do {
+            (data, response) = try await client.get(from: url)
+        } catch {
+            throw Error.connectivity
+        }
+        
+        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RemoteMarketFeedDTO.self, from: data) else { throw Error.invalidData }
         
         return []
     }
+    
+    private struct RemoteMarketFeedDTO: Decodable {}
 }
 
 final class RemoteMarketFeedLoaderTests: XCTestCase {
@@ -60,6 +77,37 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
         XCTAssertEqual(client.requestedURLs.first?.query, "category=general&token=\(token)")
     }
     
+    func test_loadMarketNews_deliversErrorConnectivity() async {
+        let (sut, spy) = makeSUT()
+        spy.stub(with: .failure(anyNSError()))
+        
+        await assertThat({
+            _ = try await sut.loadMarketNews()
+        }, throws: .connectivity)
+    }
+    
+    func test_loadMarketNews_deliversErrorInvalidDataOnNon200StatusCode() async {
+        let samples = [199, 201, 300, 400, 500]
+        let (sut, spy) = makeSUT()
+        
+        for code in samples {
+            spy.stub(statusCode: code, data: anyData())
+            
+            await assertThat({
+                _ = try await sut.loadMarketNews()
+            }, throws: .invalidData)
+        }
+    }
+    
+    func test_loadMarketNews_deliversErrorInvalidDataOn200StatusCodeWithInvalidJSON() async {
+        let (sut, spy) = makeSUT()
+        spy.stub(statusCode: 200, data: Data("invalid-data".utf8))
+        
+        await assertThat({
+            _ = try await sut.loadMarketNews()
+        }, throws: .invalidData)
+    }
+    
     
     // MARK: - Helpers
     private func makeSUT(
@@ -73,5 +121,22 @@ final class RemoteMarketFeedLoaderTests: XCTestCase {
         trackForMemoryLeaks(client, file: file, line: line)
         trackForMemoryLeaks(sut, file: file, line: line)
         return (sut, client)
+    }
+    
+    private func assertThat(
+        _ action: () async throws -> Any,
+        throws expectedError: RemoteMarketFeedLoader.Error,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        do {
+            _ = try await action()
+            XCTFail("Expected \(expectedError), got success", file: file, line: line)
+        } catch let error as RemoteMarketFeedLoader.Error {
+            XCTAssertEqual(error, expectedError, file: file, line: line)
+            XCTAssertNotNil(error.localizedDescription, file: file, line: line)
+        } catch {
+            XCTFail("Expected \(expectedError), got failure \(error)", file: file, line: line)
+        }
     }
 }
