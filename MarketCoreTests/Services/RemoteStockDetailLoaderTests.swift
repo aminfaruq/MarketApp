@@ -24,7 +24,6 @@ final class RemoteStockDetailLoader {
         }
     }
     
-    
     private let url: URL
     private let client: HTTPClient
     private let token: String
@@ -56,6 +55,28 @@ final class RemoteStockDetailLoader {
         return data.toModel()
     }
     
+    func loadQuote(symbol: String) async throws -> StockQuoteModel {
+        let queryItems = [
+            URLQueryItem(name: "symbol", value: symbol),
+            URLQueryItem(name: "token", value: token)
+        ]
+        
+        let requestURL = url.appendingQueryItems(queryItems)
+        let response: HTTPURLResponse
+        let data: Data
+        
+        do {
+            (data, response) = try await client.get(from: requestURL)
+        } catch {
+            throw Error.connectivity
+        }
+        
+        guard response.statusCode == 200, let _ = try? JSONDecoder().decode(RemoteStockQuoteDTO.self, from: data) else { throw Error.invalidData }
+        
+        
+        return .init(symbol: symbol, currentPrice: 0, change: 0, percentChange: 0, highPrice: 0, lowPrice: 0, openPrice: 0, previousClose: 0, timestamp: Date())
+    }
+    
     private struct RemoteProfileDTO: Decodable {
         let ticker: String
         let name: String
@@ -75,6 +96,10 @@ final class RemoteStockDetailLoader {
             )
         }
     }
+    
+    private struct RemoteStockQuoteDTO: Decodable {
+        
+    }
 }
 
 final class RemoteStockDetailLoaderTests: XCTestCase {
@@ -85,7 +110,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         XCTAssertTrue(client.requestedURLs.isEmpty)
     }
     
-    // MARK: PROFILE
+    // MARK: - PROFILE
     func test_loadProfile_requestsDataFromURL() async {
         let query = "AAPL"
         let token = anyToken()
@@ -106,7 +131,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         let (sut, client) = makeSUT(url: anyURL())
         client.stub(with: .failure(anyNSError()))
         
-        await assertThat(sut, throws: .connectivity)
+        await assertThat({ try await sut.loadProfile(symbol: anyString()) }, throws: .connectivity)
     }
     
     func test_loadProfile_deliversInvalidDataOnNon200StatusCode() async {
@@ -116,7 +141,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
             let (sut, client) = makeSUT(url: anyURL())
             client.stub(statusCode: code, data: anyData())
             
-            await assertThat(sut, throws: .invalidData)
+            await assertThat({ try await sut.loadProfile(symbol: anyString()) }, throws: .invalidData)
         }
     }
     
@@ -124,7 +149,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         let (sut, client) = makeSUT(url: anyURL())
         client.stub(statusCode: 200, data: Data("invalid json".utf8))
         
-        await assertThat(sut, throws: .invalidData)
+        await assertThat({ try await sut.loadProfile(symbol: anyString()) }, throws: .invalidData)
     }
     
     func test_loadProfile_deliversProfileOn200StatusCodeWithValidJSON() async throws {
@@ -139,6 +164,49 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         
         XCTAssertEqual(receivedProfile, profile.model)
     }
+    
+    // MARK: - QUOTE
+    func test_loadQuote_requestsDataFromURL() async {
+        let query = "AAPL"
+        let token = anyToken()
+        let url = anyURL()
+        let expectedURL = url.appendingQueryItems([
+            URLQueryItem(name: "symbol", value: query),
+            URLQueryItem(name: "token", value: token)
+        ])
+        let (sut, client) = makeSUT(url: url, token: token)
+        
+        _ = try? await sut.loadQuote(symbol: query)
+        
+        XCTAssertEqual(client.requestedURLs, [expectedURL])
+        XCTAssertEqual(client.requestedURLs.first?.query, "symbol=\(query)&token=\(token)")
+    }
+    
+    func test_loadQuote_deliversErrorConnectivity() async {
+        let (sut, client) = makeSUT(url: anyURL())
+        client.stub(with: .failure(anyNSError()))
+                
+        await assertThat({ try await sut.loadQuote(symbol: anyString()) }, throws: .connectivity)
+    }
+    
+    func test_loadQuote_deliversInvalidDataOnNon200StatusCode() async {
+        let samples = [199, 201, 300, 400, 500]
+        
+        for code in samples {
+            let (sut, client) = makeSUT(url: anyURL())
+            client.stub(statusCode: code, data: anyData())
+            
+            await assertThat({ try await sut.loadQuote(symbol: anyString()) }, throws: .invalidData)
+        }
+    }
+    
+    func test_loadQuote_deliversInvalidData200StatusCodeWithInvalidJSON() async {
+        let (sut, client) = makeSUT(url: anyURL())
+        client.stub(statusCode: 200, data: Data("invalid json".utf8))
+        
+        await assertThat({ try await sut.loadQuote(symbol: anyString()) }, throws: .invalidData)
+    }
+    
     
     //MARK: - HELPERS
     private func makeSUT(
@@ -156,13 +224,13 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
     }
     
     private func assertThat(
-        _ sut: RemoteStockDetailLoader,
+        _ action: () async throws -> Any,
         throws expectedError: RemoteStockDetailLoader.Error,
         file: StaticString = #filePath,
         line: UInt = #line
     ) async {
         do {
-            _ = try await sut.loadProfile(symbol: anyString())
+            _ = try await action()
             XCTFail("Expected \(expectedError), got success", file: file, line: line)
         } catch let error as RemoteStockDetailLoader.Error {
             XCTAssertEqual(error, expectedError, file: file, line: line)
