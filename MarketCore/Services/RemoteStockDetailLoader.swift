@@ -27,8 +27,8 @@ public final class RemoteStockDetailLoader: StockDetailLoader, @unchecked Sendab
     private let client: HTTPClient
     private let token: String
     
-    public init (url: URL, token: String, client: HTTPClient) {
-        self.baseURL = url
+    public init (baseURL: URL, token: String, client: HTTPClient) {
+        self.baseURL = baseURL
         self.token = token
         self.client = client
     }
