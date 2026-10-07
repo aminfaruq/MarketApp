@@ -138,7 +138,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         line: UInt = #line
     ) -> (sut: RemoteStockDetailLoader, client: HTTPClientSpy){
         let client = HTTPClientSpy()
-        let sut = RemoteStockDetailLoader(url: url, token: token, client: client)
+        let sut = RemoteStockDetailLoader(baseURL: url, token: token, client: client)
         trackForMemoryLeaks(client, file: file, line: line)
         trackForMemoryLeaks(sut, file: file, line: line)
         
