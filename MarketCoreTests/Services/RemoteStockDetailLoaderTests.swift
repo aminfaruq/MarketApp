@@ -24,12 +24,12 @@ final class RemoteStockDetailLoader {
         }
     }
     
-    private let url: URL
+    private let baseURL: URL
     private let client: HTTPClient
     private let token: String
     
     init (url: URL, token: String, client: HTTPClient) {
-        self.url = url
+        self.baseURL = url
         self.token = token
         self.client = client
     }
@@ -40,7 +40,9 @@ final class RemoteStockDetailLoader {
             URLQueryItem(name: "token", value: token)
         ]
         
-        let requestURL = url.appendingQueryItems(queryItems)
+        let requestURL = baseURL
+            .appendingPathComponent("stock/profile2")
+            .appendingQueryItems(queryItems)
         let response: HTTPURLResponse
         let data: Data
         
@@ -50,9 +52,9 @@ final class RemoteStockDetailLoader {
             throw Error.connectivity
         }
         
-        guard response.statusCode == 200, let data = try? JSONDecoder().decode(RemoteProfileDTO.self, from: data) else { throw Error.invalidData }
+        guard response.statusCode == 200, let root = try? JSONDecoder().decode(RemoteProfileDTO.self, from: data) else { throw Error.invalidData }
         
-        return data.toModel()
+        return root.toModel()
     }
     
     func loadQuote(symbol: String) async throws -> StockQuoteModel {
@@ -61,7 +63,9 @@ final class RemoteStockDetailLoader {
             URLQueryItem(name: "token", value: token)
         ]
         
-        let requestURL = url.appendingQueryItems(queryItems)
+        let requestURL = baseURL
+            .appendingPathComponent("quote")
+            .appendingQueryItems(queryItems)
         let response: HTTPURLResponse
         let data: Data
         
@@ -117,7 +121,7 @@ final class RemoteStockDetailLoader {
                 lowPrice: l,
                 openPrice: o,
                 previousClose: pc,
-                timestamp: Date(timeIntervalSince1970: t / 1000.0)
+                timestamp: Date(timeIntervalSince1970: t)
             )
         }
     }
@@ -136,10 +140,12 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         let query = "AAPL"
         let token = anyToken()
         let url = anyURL()
-        let expectedURL = url.appendingQueryItems([
-            URLQueryItem(name: "symbol", value: query),
-            URLQueryItem(name: "token", value: token)
-        ])
+        let expectedURL = url
+            .appendingPathComponent("stock/profile2")
+            .appendingQueryItems([
+                URLQueryItem(name: "symbol", value: query),
+                URLQueryItem(name: "token", value: token)
+            ])
         let (sut, client) = makeSUT(url: url, token: token)
         
         _ = try? await sut.loadProfile(symbol: query)
@@ -191,10 +197,12 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
         let query = "AAPL"
         let token = anyToken()
         let url = anyURL()
-        let expectedURL = url.appendingQueryItems([
-            URLQueryItem(name: "symbol", value: query),
-            URLQueryItem(name: "token", value: token)
-        ])
+        let expectedURL = url
+            .appendingPathComponent("quote")
+            .appendingQueryItems([
+                URLQueryItem(name: "symbol", value: query),
+                URLQueryItem(name: "token", value: token)
+            ])
         let (sut, client) = makeSUT(url: url, token: token)
         
         _ = try? await sut.loadQuote(symbol: query)
@@ -337,7 +345,7 @@ final class RemoteStockDetailLoaderTests: XCTestCase {
             lowPrice: lowPrice,
             openPrice: openPrice,
             previousClose: previousClose,
-            timestamp: Date(timeIntervalSince1970: timestamp / 1000.0)
+            timestamp: Date(timeIntervalSince1970: timestamp)
         )
         return (model, json)
     }
