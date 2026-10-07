@@ -59,6 +59,7 @@ public final class StockSearchViewModel: ViewModelType {
         let errorRelay = PublishRelay<String>()
         
         let items = input.searchTrigger
+            .distinctUntilChanged()
             .flatMapLatest { [loader] query -> Observable<[SearchResultItemViewModel]> in
                 
                 let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
