@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class RemoteStockDetailLoader {
+public final class RemoteStockDetailLoader: StockDetailLoader, @unchecked Sendable {
     
     public enum Error: Swift.Error, LocalizedError, Equatable {
         case connectivity
