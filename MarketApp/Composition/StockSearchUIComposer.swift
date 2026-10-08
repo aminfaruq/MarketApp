@@ -15,8 +15,8 @@ public final class StockSearchUIComposer {
     private init() {}
     
     public static func makeStockSearchViewController(
-        baseURL: URL = URL(string: "https://finnhub.io/api/v1")!,
-        token: String = "---YOUR TOKEN---"
+        baseURL: URL,
+        token: String
     ) -> StockSearchViewController {
         let httpClient = URLSessionHTTPClient()
         let searchLoader = RemoteStockSearchLoader(baseURL: baseURL, token: token, client: httpClient)
