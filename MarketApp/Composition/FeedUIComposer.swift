@@ -16,8 +16,8 @@ public final class FeedUIComposer {
     private init() {}
     
     public static func makeFeedViewController(
-        baseURL: URL = URL(string: "https://finnhub.io/api/v1")!,
-        token: String = "---YOUR TOKEN---"
+        baseURL: URL,
+        token: String
     ) -> MarketFeedViewController {
         
         let httpClient = URLSessionHTTPClient()
