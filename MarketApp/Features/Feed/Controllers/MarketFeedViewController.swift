@@ -14,6 +14,7 @@ import MarketPresentation
 public final class MarketFeedViewController: ASDKViewController<ASCollectionNode>, ListAdapterDataSource {
     public var onSelectQuote: ((String) -> Void)?
     public var onSelectNews: ((URL) -> Void)?
+    public var onOpenSearch: (() -> Void)?
     
     private let viewModel: MarketFeedViewModel
     private let disposeBag = DisposeBag()
@@ -60,9 +61,20 @@ public final class MarketFeedViewController: ASDKViewController<ASCollectionNode
         navigationController?.navigationBar.prefersLargeTitles = true
         node.backgroundColor = .systemBackground
         
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "magnifyingglass"),
+            style: .plain,
+            target: self,
+            action: #selector(didTapSearch)
+        )
+        
         node.view.alwaysBounceVertical = true
         node.view.refreshControl = refreshControl
         refreshControl.addTarget(self, action: #selector(didPullToRefresh), for: .valueChanged)
+    }
+    
+    @objc private func didTapSearch() {
+        onOpenSearch?()
     }
     
     @objc private func didPullToRefresh() {
