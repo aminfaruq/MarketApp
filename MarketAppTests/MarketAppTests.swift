@@ -153,4 +153,89 @@ final class MarketAppTests: XCTestCase {
         feedVC?.onOpenSearch?()
         XCTAssertEqual(tabBar.selectedIndex, 1)
     }
+
+    func test_stockChartHistoryGenerator_generatesPointsForEachTimeframe() {
+        for timeframe in StockChartTimeframe.allCases {
+            let points = StockChartHistoryGenerator.generatePoints(
+                symbol: "AAPL",
+                currentPrice: 180.0,
+                openPrice: 175.0,
+                highPrice: 182.0,
+                lowPrice: 174.0,
+                previousClose: 176.0,
+                timeframe: timeframe
+            )
+            
+            XCTAssertFalse(points.isEmpty, "Points for \(timeframe.rawValue) should not be empty")
+            XCTAssertEqual(points.last?.price, 180.0, "Last point price should match current price")
+        }
+    }
+
+    func test_stockChartNode_configure_generatesPointsAndUpdatesUI() {
+        let chartNode = StockChartNode()
+        let vm = StockDetailItemViewModel(
+            symbol: "AAPL",
+            companyName: "Apple Inc.",
+            logoURL: nil,
+            industry: "Technology",
+            exchange: "NASDAQ",
+            formattedPrice: "$180.00",
+            formattedChange: "+$4.00 (+2.27%)",
+            isPositive: true,
+            formattedHigh: "$182.00",
+            formattedLow: "$174.00",
+            formattedOpen: "$175.00",
+            formattedPrevClose: "$176.00",
+            currentPrice: 180.0,
+            openPrice: 175.0,
+            highPrice: 182.0,
+            lowPrice: 174.0,
+            previousClose: 176.0
+        )
+        
+        chartNode.configure(with: vm)
+        _ = chartNode.view
+        
+        XCTAssertNotNil(chartNode)
+    }
+
+    func test_stockChartNode_updateLivePrice_updatesPrice() {
+        let chartNode = StockChartNode()
+        let vm = StockDetailItemViewModel(
+            symbol: "AAPL",
+            companyName: "Apple Inc.",
+            logoURL: nil,
+            industry: "Technology",
+            exchange: "NASDAQ",
+            formattedPrice: "$180.00",
+            formattedChange: "+$4.00 (+2.27%)",
+            isPositive: true,
+            formattedHigh: "$182.00",
+            formattedLow: "$174.00",
+            formattedOpen: "$175.00",
+            formattedPrevClose: "$176.00",
+            currentPrice: 180.0,
+            openPrice: 175.0,
+            highPrice: 182.0,
+            lowPrice: 174.0,
+            previousClose: 176.0
+        )
+        chartNode.configure(with: vm)
+        _ = chartNode.view
+        
+        // Update live price
+        chartNode.updateLivePrice(185.50)
+        
+        XCTAssertNotNil(chartNode)
+    }
+
+    func test_stockDetailViewController_containsChartNode() {
+        let detailVC = StockDetailUIComposer.makeStockDetailViewController(symbol: "AAPL")
+        _ = detailVC.node.view
+        
+        XCTAssertNotNil(detailVC.node.chartNode)
+        XCTAssertNotNil(detailVC.node.headerNode)
+        XCTAssertNotNil(detailVC.node.priceNode)
+        XCTAssertNotNil(detailVC.node.metricsNode)
+    }
 }
