@@ -12,6 +12,9 @@ import AsyncDisplayKit
 import MarketPresentation
 
 public final class MarketFeedViewController: ASDKViewController<ASCollectionNode>, ListAdapterDataSource {
+    public var onSelectQuote: ((String) -> Void)?
+    public var onSelectNews: ((URL) -> Void)?
+    
     private let viewModel: MarketFeedViewModel
     private let disposeBag = DisposeBag()
     
@@ -118,9 +121,17 @@ public final class MarketFeedViewController: ASDKViewController<ASCollectionNode
     
     public func listAdapter(_ listAdapter: ListAdapter, sectionControllerFor object: Any) -> ListSectionController {
         if object is StockQuoteDiffableModel {
-            return StockQuoteSectionController()
+            let sc = StockQuoteSectionController()
+            sc.onSelect = { [weak self] symbol in
+                self?.onSelectQuote?(symbol)
+            }
+            return sc
         } else {
-            return MarketNewsSectionController()
+            let sc = MarketNewsSectionController()
+            sc.onSelect = { [weak self] url in
+                self?.onSelectNews?(url)
+            }
+            return sc
         }
     }
     
