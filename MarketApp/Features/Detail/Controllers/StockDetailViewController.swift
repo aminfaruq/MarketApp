@@ -41,6 +41,8 @@ public final class StockDetailViewController: ASDKViewController<StockDetailScro
     
     public override func viewDidLoad() {
         super.viewDidLoad()
+        self.tabBarController?.tabBar.isHidden = true
+
         setupUI()
         bindViewModel()
         
@@ -54,6 +56,8 @@ public final class StockDetailViewController: ASDKViewController<StockDetailScro
     
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        self.tabBarController?.tabBar.isHidden = false
+
         stopStreaming.onNext(())
     }
     
@@ -66,6 +70,14 @@ public final class StockDetailViewController: ASDKViewController<StockDetailScro
         refreshControl.addTarget(self, action: #selector(didPullToRefresh), for: .valueChanged)
         
         node.headerNode.configurePlaceholder(symbol: symbol)
+        
+        node.chartNode.onScrubPrice = { [weak self] scrubbedPrice, _ in
+            if let price = scrubbedPrice {
+                self?.node.priceNode.showScrubbedPrice(price)
+            } else {
+                self?.node.priceNode.restorePrice()
+            }
+        }
     }
     
     @objc private func didPullToRefresh() {
@@ -86,6 +98,7 @@ public final class StockDetailViewController: ASDKViewController<StockDetailScro
                 guard let self = self else { return }
                 self.node.headerNode.configure(with: item)
                 self.node.priceNode.configure(with: item)
+                self.node.chartNode.configure(with: item)
                 self.node.metricsNode.configure(with: item)
             })
             .disposed(by: disposeBag)
@@ -120,6 +133,7 @@ public final class StockDetailViewController: ASDKViewController<StockDetailScro
             .observe(on: MainScheduler.instance)
             .subscribe(onNext: { [weak self] trade in
                 self?.node.priceNode.updateLiveTrade(trade)
+                self?.node.chartNode.updateLivePrice(trade.price)
             })
             .disposed(by: disposeBag)
         
