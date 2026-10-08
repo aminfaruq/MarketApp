@@ -32,10 +32,10 @@ public final class StockQuoteSectionController: ListSectionController, ASSection
     }
     
     public override func cellForItem(at index: Int) -> UICollectionViewCell {
-        return ASIGListSectionControllerMethods.cellForItem(at: index, sectionController: self)
+        return collectionContext?.dequeueReusableCell(of: UICollectionViewCell.self, for: self, at: index) ?? UICollectionViewCell()
     }
     
     public override func sizeForItem(at index: Int) -> CGSize {
-        return ASIGListSectionControllerMethods.sizeForItem(at: index)
+        return .zero
     }
 }
