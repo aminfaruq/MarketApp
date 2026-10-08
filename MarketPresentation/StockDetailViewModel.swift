@@ -26,6 +26,12 @@ public struct StockDetailItemViewModel: Equatable, Sendable {
     public let formattedOpen: String
     public let formattedPrevClose: String
     
+    public let currentPrice: Double
+    public let openPrice: Double
+    public let highPrice: Double
+    public let lowPrice: Double
+    public let previousClose: Double
+    
     public init(
         symbol: String,
         companyName: String,
@@ -38,7 +44,12 @@ public struct StockDetailItemViewModel: Equatable, Sendable {
         formattedHigh: String,
         formattedLow: String,
         formattedOpen: String,
-        formattedPrevClose: String
+        formattedPrevClose: String,
+        currentPrice: Double = 0.0,
+        openPrice: Double = 0.0,
+        highPrice: Double = 0.0,
+        lowPrice: Double = 0.0,
+        previousClose: Double = 0.0
     ) {
         self.symbol = symbol
         self.companyName = companyName
@@ -52,6 +63,11 @@ public struct StockDetailItemViewModel: Equatable, Sendable {
         self.formattedLow = formattedLow
         self.formattedOpen = formattedOpen
         self.formattedPrevClose = formattedPrevClose
+        self.currentPrice = currentPrice
+        self.openPrice = openPrice
+        self.highPrice = highPrice
+        self.lowPrice = lowPrice
+        self.previousClose = previousClose
     }
     
     public init(profile: CompanyProfileModel, quote: StockQuoteModel) {
@@ -75,6 +91,12 @@ public struct StockDetailItemViewModel: Equatable, Sendable {
         self.formattedLow = String(format: "$%.2f", quote.lowPrice)
         self.formattedOpen = String(format: "$%.2f", quote.openPrice)
         self.formattedPrevClose = String(format: "$%.2f", quote.previousClose)
+        
+        self.currentPrice = quote.currentPrice
+        self.openPrice = quote.openPrice
+        self.highPrice = quote.highPrice
+        self.lowPrice = quote.lowPrice
+        self.previousClose = quote.previousClose
     }
 }
 
