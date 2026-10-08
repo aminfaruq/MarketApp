@@ -16,13 +16,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         
         let window = UIWindow(windowScene: windowScene)
+        let rootViewController = AppComposer.makeRootViewController()
         
-        let feedViewController = FeedUIComposer.makeFeedViewController()
-        
-        let navigationController = UINavigationController(rootViewController: feedViewController)
-        navigationController.navigationBar.prefersLargeTitles = true
-        
-        window.rootViewController = navigationController
+        window.rootViewController = rootViewController
         self.window = window
         window.makeKeyAndVisible()
     }
