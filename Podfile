@@ -43,4 +43,16 @@ post_install do |installer|
     )
     File.write(text_layout_path, patched) if content != patched
   end
+
+  # Patch Texture ASIGListAdapterBasedDataSource.mm for IGListKit 5.0 compatibility
+  adapter_ds_path = 'Pods/Texture/Source/Private/ASIGListAdapterBasedDataSource.mm'
+  if File.exist?(adapter_ds_path)
+    File.chmod(0644, adapter_ds_path)
+    content = File.read(adapter_ds_path)
+    # Replace entire configureUpdater method body with a safe no-op for IGListKit 5.0
+    original_code = "+ (void)configureUpdater:(id<IGListUpdatingDelegate>)updater\n{\n  // Cast to NSObject will be removed after https://github.com/Instagram/IGListKit/pull/435\n  if ([(id<NSObject>)updater isKindOfClass:[IGListAdapterUpdater class]]) {\n    [(IGListAdapterUpdater *)updater setAllowsBackgroundReloading:NO];\n  } else {\n    static dispatch_once_t onceToken;\n    dispatch_once(&onceToken, ^{\n      NSLog(@\"WARNING: Use of non-%@ updater with AsyncDisplayKit is discouraged. Updater: %@\", NSStringFromClass([IGListAdapterUpdater class]), updater);\n    });\n  }\n}"
+    replacement_code = "+ (void)configureUpdater:(id<IGListUpdatingDelegate>)updater\n{\n  // In IGListKit 5.0+, setAllowsBackgroundReloading was removed by Meta/Instagram.\n}"
+    patched = content.gsub(original_code, replacement_code)
+    File.write(adapter_ds_path, patched) if content != patched
+  end
 end
