@@ -11,7 +11,13 @@ import MarketPresentation
 
 public final class StockQuoteSectionController: ListSectionController, ASSectionController {
     
+    public var onSelect: ((String) -> Void)?
     private var item: StockQuoteDiffableModel?
+    
+    public override func didSelectItem(at index: Int) {
+        guard let symbol = item?.viewModel.symbol else { return }
+        onSelect?(symbol)
+    }
     
     public override func didUpdate(to object: Any) {
         self.item = object as? StockQuoteDiffableModel
