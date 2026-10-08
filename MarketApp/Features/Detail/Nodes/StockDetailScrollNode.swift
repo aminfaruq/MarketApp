@@ -12,6 +12,7 @@ import UIKit
 public final class StockDetailScrollNode: ASScrollNode {
     public let headerNode = StockDetailHeaderNode()
     public let priceNode = StockDetailPriceNode()
+    public let chartNode = StockChartNode()
     public let metricsNode = StockDetailMetricsNode()
     
     public override init() {
@@ -28,7 +29,7 @@ public final class StockDetailScrollNode: ASScrollNode {
             spacing: 24,
             justifyContent: .start,
             alignItems: .stretch,
-            children: [headerNode, priceNode, metricsNode]
+            children: [headerNode, priceNode, chartNode, metricsNode]
         )
         
         return ASInsetLayoutSpec(
