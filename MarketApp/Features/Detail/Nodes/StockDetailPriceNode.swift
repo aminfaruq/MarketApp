@@ -15,6 +15,8 @@ public final class StockDetailPriceNode: ASDisplayNode {
     private let liveBadgeNode = ASTextNode()
     private let tradeInfoNode = ASTextNode()
     
+    private var lastConfiguredViewModel: StockDetailItemViewModel?
+    
     public override init() {
         super.init()
         automaticallyManagesSubnodes = true
@@ -25,6 +27,7 @@ public final class StockDetailPriceNode: ASDisplayNode {
     }
     
     public func configure(with viewModel: StockDetailItemViewModel) {
+        self.lastConfiguredViewModel = viewModel
         priceNode.attributedText = NSAttributedString(
             string: viewModel.formattedPrice,
             attributes: [
@@ -42,6 +45,29 @@ public final class StockDetailPriceNode: ASDisplayNode {
             ]
         )
         
+        setNeedsLayout()
+    }
+    
+    public func showScrubbedPrice(_ price: Double) {
+        priceNode.attributedText = NSAttributedString(
+            string: String(format: "$%.2f", price),
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 36, weight: .bold),
+                .foregroundColor: UIColor.label
+            ]
+        )
+        setNeedsLayout()
+    }
+    
+    public func restorePrice() {
+        guard let vm = lastConfiguredViewModel else { return }
+        priceNode.attributedText = NSAttributedString(
+            string: vm.formattedPrice,
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 36, weight: .bold),
+                .foregroundColor: UIColor.label
+            ]
+        )
         setNeedsLayout()
     }
     
