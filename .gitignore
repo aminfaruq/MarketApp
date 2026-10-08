@@ -1,0 +1,45 @@
+## --- macOS System Artifacts ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+## --- Xcode User & Workspace Data ---
+*.xcuserstate
+project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcuserdatad/
+xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+## --- Build & Derived Data ---
+build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## --- Swift Package Manager (SPM) ---
+.build/
+.swiftpm/xcode/xcuserdata/
+Packages/
+
+## --- CocoaPods ---
+Pods/
+
+## --- Testing & Fastlane ---
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+## --- Temporary & Scratch Files ---
+*.swp
+*~
+*.orig
+build-dd/
