@@ -50,9 +50,16 @@ public final class RemoteMarketFeedLoader: MarketFeedLoader , @unchecked Sendabl
             throw Error.connectivity
         }
         
-        guard response.statusCode == 200, let root = try? JSONDecoder().decode([RemoteMarketFeedDTO].self, from: data) else { throw Error.invalidData }
+        guard response.statusCode == 200 else {
+            throw Error.invalidData
+        }
         
-        return root.map({ $0.toModel() })
+        do {
+            let root = try JSONDecoder().decode([RemoteMarketFeedDTO].self, from: data)
+            return root.map({ $0.toModel() })
+        } catch {
+            throw Error.invalidData
+        }
     }
     
     public func loadQuotes(symbols: [String]) async throws -> [StockQuoteModel] {
@@ -105,48 +112,48 @@ public final class RemoteMarketFeedLoader: MarketFeedLoader , @unchecked Sendabl
     }
     
     private struct RemoteMarketFeedDTO: Decodable {
-        let datetime: Double
-        let headline: String
-        let id: Int
-        let image: String
-        let source: String
-        let summary: String
-        let url: String
+        let datetime: Double?
+        let headline: String?
+        let id: Int?
+        let image: String?
+        let source: String?
+        let summary: String?
+        let url: String?
         
         func toModel() -> MarketNewsModel {
             .init(
-                id: id,
-                headline: headline,
-                summary: summary,
-                source: source,
-                imageURL: URL(string: image),
-                newsURL: URL(string: url),
-                publishedAt: Date(timeIntervalSince1970: datetime)
+                id: id ?? Int.random(in: 1...1000000),
+                headline: headline ?? "",
+                summary: summary ?? "",
+                source: source ?? "Finnhub",
+                imageURL: (image?.isEmpty == false) ? URL(string: image!) : nil,
+                newsURL: (url?.isEmpty == false) ? URL(string: url!) : nil,
+                publishedAt: Date(timeIntervalSince1970: datetime ?? Date().timeIntervalSince1970)
             )
         }
     }
     
     private struct RemoteStockQuoteDTO: Decodable {
-        let c: Double
-        let d: Double
-        let dp: Double
-        let h: Double
-        let l: Double
-        let o: Double
-        let pc: Double
-        let t: Double
+        let c: Double?
+        let d: Double?
+        let dp: Double?
+        let h: Double?
+        let l: Double?
+        let o: Double?
+        let pc: Double?
+        let t: Double?
         
         func toModel(symbol: String) -> StockQuoteModel {
             .init(
                 symbol: symbol,
-                currentPrice: c,
-                change: d,
-                percentChange: dp,
-                highPrice: h,
-                lowPrice: l,
-                openPrice: o,
-                previousClose: pc,
-                timestamp: Date(timeIntervalSince1970: t)
+                currentPrice: c ?? 0,
+                change: d ?? 0,
+                percentChange: dp ?? 0,
+                highPrice: h ?? 0,
+                lowPrice: l ?? 0,
+                openPrice: o ?? 0,
+                previousClose: pc ?? 0,
+                timestamp: Date(timeIntervalSince1970: t ?? Date().timeIntervalSince1970)
             )
         }
     }
