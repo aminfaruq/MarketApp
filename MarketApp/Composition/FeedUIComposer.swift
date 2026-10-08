@@ -39,6 +39,18 @@ public final class FeedUIComposer {
             viewController?.present(safariVC, animated: true)
         }
         
+        viewController.onOpenSearch = { [weak viewController] in
+            if let tabBar = viewController?.tabBarController {
+                tabBar.selectedIndex = 1
+            } else {
+                let searchVC = StockSearchUIComposer.makeStockSearchViewController(
+                    baseURL: baseURL,
+                    token: token
+                )
+                viewController?.navigationController?.pushViewController(searchVC, animated: true)
+            }
+        }
+        
         return viewController
     }
 }
