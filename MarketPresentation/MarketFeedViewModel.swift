@@ -164,18 +164,12 @@ public final class MarketFeedViewModel: ViewModelType {
             return Observable.create { observer in
                 let task = Task {
                     do {
-                        async let quotesTask = (try? await loader.loadQuotes(symbols: symbols)) ?? []
-                        async let newsTask = (try? await loader.loadMarketNews()) ?? []
+                        async let quotes = loader.loadQuotes(symbols: symbols)
+                        async let news = loader.loadMarketNews()
                         
-                        let quotes = await quotesTask
-                        let news = await newsTask
-                        
-                        if quotes.isEmpty && news.isEmpty {
-                            throw NSError(domain: "MarketFeed", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load market feed. Pull to refresh."])
-                        }
-                        
+                        let result = try await (quotes, news)
                         guard !Task.isCancelled else { return }
-                        observer.onNext((quotes, news))
+                        observer.onNext(result)
                         observer.onCompleted()
                     } catch {
                         if !Task.isCancelled && !(error is CancellationError) {
