@@ -15,9 +15,9 @@ public final class StockDetailUIComposer {
     
     public static func makeStockDetailViewController(
         symbol: String,
-        baseURL: URL = URL(string: "https://finnhub.io/api/v1")!,
+        baseURL: URL,
         wsURL: URL? = nil,
-        token: String = "---YOUR TOKEN---"
+        token: String
     ) -> StockDetailViewController {
         let httpClient = URLSessionHTTPClient()
         let detailLoader = RemoteStockDetailLoader(baseURL: baseURL, token: token, client: httpClient)
