@@ -1,7 +1,19 @@
 platform :ios, '17.0'
 use_frameworks!
 
-# MarketApp (UI Target: Texture, IGListKit, UIKit, RxCocoa)
+# 1. MarketPresentation (Only RxSwift & RxRelay - ZERO UIKit/RxCocoa!)
+target 'MarketPresentation' do
+  pod 'RxSwift', '~> 6.8'
+  pod 'RxRelay', '~> 6.8'
+
+  target 'MarketPresentationTests' do
+    inherit! :search_paths
+    pod 'RxTest', '~> 6.8'
+    pod 'RxBlocking', '~> 6.8'
+  end
+end
+
+# 2. MarketApp (UI Target: Texture, IGListKit, UIKit, RxCocoa)
 target 'MarketApp' do
   pod 'Texture', '~> 3.1'
   pod 'IGListKit', '~> 5.0'
@@ -23,9 +35,27 @@ post_install do |installer|
     if target.name == 'Texture'
       target.build_configurations.each do |config|
         config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
-        config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_ROOT}/IGListKit/Source"'
-        config.build_settings['HEADER_SEARCH_PATHS'] << ' "${PODS_ROOT}/IGListDiffKit/Source"'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '$(PODS_ROOT)/IGListKit/Source'
+        config.build_settings['HEADER_SEARCH_PATHS'] << '$(PODS_ROOT)/IGListDiffKit/Source'
       end
+    end
+  end
+
+  texture_target = installer.pods_project.targets.find { |t| t.name == 'Texture' }
+  iglistkit_target = installer.pods_project.targets.find { |t| t.name == 'IGListKit' }
+  iglistdiffkit_target = installer.pods_project.targets.find { |t| t.name == 'IGListDiffKit' }
+  if texture_target && iglistkit_target
+    texture_target.add_dependency(iglistkit_target)
+    product = iglistkit_target.product_reference
+    if product && !texture_target.frameworks_build_phase.files_references.include?(product)
+      texture_target.frameworks_build_phase.add_file_reference(product)
+    end
+  end
+  if texture_target && iglistdiffkit_target
+    texture_target.add_dependency(iglistdiffkit_target)
+    product = iglistdiffkit_target.product_reference
+    if product && !texture_target.frameworks_build_phase.files_references.include?(product)
+      texture_target.frameworks_build_phase.add_file_reference(product)
     end
   end
 
