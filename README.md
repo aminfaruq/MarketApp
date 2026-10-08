@@ -2,6 +2,12 @@
 
 An iOS stock market app built with a modular, test-driven architecture. It shows a market feed (quotes and news), stock search, and a stock detail screen with a chart and live trade prices streamed over WebSocket. Data comes from the [Finnhub](https://finnhub.io) API.
 
+## Demo
+
+| Home | Search | Detail |
+| --- | --- | --- |
+| <img src="home-screen.png" width="250" alt="Home screen"> | <img src="search-screen.png" width="250" alt="Search screen"> | <img src="detail-screen.png" width="250" alt="Detail screen"> |
+
 ## Features
 
 - **Feed**: stock quotes and market news.
@@ -22,10 +28,30 @@ Composition lives in `MarketApp/Composition` (`AppComposer` and one UI composer 
 
 ```
 MarketApp/
-├── MarketApp/                    # UI app target
+├── MarketApp/                    # UI app target (Texture + IGListKit)
 │   ├── Application/              # AppDelegate, SceneDelegate, assets
 │   ├── Composition/              # Dependency wiring
-│   └── Features/                 # Feed, Search, Detail, Main (tab bar)
+│   │   ├── AppComposer.swift             # Root: builds the tab bar and holds baseURL/token
+│   │   ├── FeedUIComposer.swift
+│   │   ├── StockSearchUIComposer.swift
+│   │   └── StockDetailUIComposer.swift
+│   └── Features/
+│       ├── Main/
+│       │   └── Controllers/      # MainTabBarController
+│       ├── Feed/
+│       │   ├── Controllers/      # MarketFeedViewController
+│       │   ├── SectionControllers/   # StockQuote / MarketNews section controllers
+│       │   ├── Models/           # IGListKit diffable models
+│       │   └── Nodes/            # StockQuoteCellNode, MarketNewsCellNode
+│       ├── Search/
+│       │   ├── Controllers/      # StockSearchViewController
+│       │   ├── SectionControllers/   # SearchResult / SearchState section controllers
+│       │   ├── Models/           # Diffable models (results, empty/loading state)
+│       │   └── Nodes/            # SearchResultCellNode, SearchStateCellNode
+│       └── Detail/
+│           ├── Controllers/      # StockDetailViewController
+│           └── Nodes/            # Header, price, metrics, scroll, and chart nodes
+│                                 # (StockChartNode, CanvasNode, Timeframe, DataPoint, HistoryGenerator)
 ├── MarketCore/                   # Framework: no UI, Foundation only
 │   ├── Domain/
 │   │   ├── Entities/             # Plain models
