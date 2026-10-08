@@ -109,6 +109,7 @@ public final class MarketFeedViewModel: ViewModelType {
     public struct Output {
         public let quotes: Observable<[StockQuoteItemViewModel]>
         public let news: Observable<[MarketNewsItemViewModel]>
+        public let feed: Observable<([StockQuoteItemViewModel], [MarketNewsItemViewModel])>
         public let isLoading: Observable<Bool>
         public let isRefreshing: Observable<Bool>
         public let errorMessage: Observable<String>
@@ -116,12 +117,14 @@ public final class MarketFeedViewModel: ViewModelType {
         public init(
             quotes: Observable<[StockQuoteItemViewModel]>,
             news: Observable<[MarketNewsItemViewModel]>,
+            feed: Observable<([StockQuoteItemViewModel], [MarketNewsItemViewModel])>,
             isLoading: Observable<Bool>,
             isRefreshing: Observable<Bool>,
             errorMessage: Observable<String>
         ) {
             self.quotes = quotes
             self.news = news
+            self.feed = feed
             self.isLoading = isLoading
             self.isRefreshing = isRefreshing
             self.errorMessage = errorMessage
@@ -142,6 +145,7 @@ public final class MarketFeedViewModel: ViewModelType {
     public func transform(input: Input) -> Output {
         let quotesRelay = PublishRelay<[StockQuoteItemViewModel]>()
         let newsRelay = PublishRelay<[MarketNewsItemViewModel]>()
+        let feedRelay = PublishRelay<([StockQuoteItemViewModel], [MarketNewsItemViewModel])>()
         let isLoadingRelay = BehaviorRelay<Bool>(value: false)
         let isRefreshingRelay = BehaviorRelay<Bool>(value: false)
         let errorRelay = PublishRelay<String>()
@@ -160,14 +164,23 @@ public final class MarketFeedViewModel: ViewModelType {
             return Observable.create { observer in
                 let task = Task {
                     do {
-                        async let quotes = loader.loadQuotes(symbols: symbols)
-                        async let news = loader.loadMarketNews()
+                        async let quotesTask = (try? await loader.loadQuotes(symbols: symbols)) ?? []
+                        async let newsTask = (try? await loader.loadMarketNews()) ?? []
                         
-                        let result = try await (quotes, news)
-                        observer.onNext(result)
+                        let quotes = await quotesTask
+                        let news = await newsTask
+                        
+                        if quotes.isEmpty && news.isEmpty {
+                            throw NSError(domain: "MarketFeed", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load market feed. Pull to refresh."])
+                        }
+                        
+                        guard !Task.isCancelled else { return }
+                        observer.onNext((quotes, news))
                         observer.onCompleted()
                     } catch {
-                        observer.onError(error)
+                        if !Task.isCancelled && !(error is CancellationError) {
+                            observer.onError(error)
+                        }
                     }
                 }
                 
@@ -195,14 +208,18 @@ public final class MarketFeedViewModel: ViewModelType {
             .catch { _ in .empty() }
         }
         .subscribe(onNext: { quotes, news in
-            quotesRelay.accept(quotes.map(StockQuoteItemViewModel.init))
-            newsRelay.accept(news.map(MarketNewsItemViewModel.init))
+            let quoteVMs = quotes.map(StockQuoteItemViewModel.init)
+            let newsVMs = news.map(MarketNewsItemViewModel.init)
+            quotesRelay.accept(quoteVMs)
+            newsRelay.accept(newsVMs)
+            feedRelay.accept((quoteVMs, newsVMs))
         })
         .disposed(by: disposeBag)
         
         return Output(
             quotes: quotesRelay.asObservable(),
             news: newsRelay.asObservable(),
+            feed: feedRelay.asObservable(),
             isLoading: isLoadingRelay.asObservable(),
             isRefreshing: isRefreshingRelay.asObservable(),
             errorMessage: errorRelay.asObservable()
