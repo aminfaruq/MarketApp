@@ -21,6 +21,7 @@ public final class MarketNewsSectionController: ListSectionController, ASSection
         return 1
     }
     
+    @objc(nodeBlockForItemAtIndex:)
     public func nodeBlockForItem(at index: Int) -> ASCellNodeBlock {
         guard let viewModel = item?.viewModel else {
             return { ASCellNode() }
@@ -31,11 +32,24 @@ public final class MarketNewsSectionController: ListSectionController, ASSection
         }
     }
     
+    @objc(sizeRangeForItemAtIndex:)
+    public func sizeRangeForItem(at index: Int) -> ASSizeRange {
+        let containerWidth = collectionContext?.containerSize.width ?? 0
+        let width = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
+        return ASSizeRange(
+            min: CGSize(width: width, height: 104),
+            max: CGSize(width: width, height: .infinity)
+        )
+    }
+    
     public override func cellForItem(at index: Int) -> UICollectionViewCell {
-        return collectionContext?.dequeueReusableCell(of: UICollectionViewCell.self, for: self, at: index) ?? UICollectionViewCell()
+        // Must be Texture's own cell class; a plain UICollectionViewCell never hosts the node.
+        return ASIGListSectionControllerMethods.cellForItem(at: index, sectionController: self)
     }
     
     public override func sizeForItem(at index: Int) -> CGSize {
-        return .zero
+        let containerWidth = collectionContext?.containerSize.width ?? 0
+        let width = containerWidth > 0 ? containerWidth : UIScreen.main.bounds.width
+        return CGSize(width: width, height: 104)
     }
 }
