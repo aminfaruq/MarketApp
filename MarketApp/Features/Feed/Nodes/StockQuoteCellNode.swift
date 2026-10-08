@@ -51,7 +51,6 @@ public final class StockQuoteCellNode: ASCellNode {
     }
     
     public override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
-        
         let rightStack = ASStackLayoutSpec(
             direction: .vertical,
             spacing: 4,
@@ -60,12 +59,15 @@ public final class StockQuoteCellNode: ASCellNode {
             children: [priceNode, changeNode]
         )
         
+        let spacer = ASLayoutSpec()
+        spacer.style.flexGrow = 1.0
+        
         let mainHorizontalStack = ASStackLayoutSpec(
             direction: .horizontal,
-            spacing: 0,
-            justifyContent: .spaceBetween,
+            spacing: 8,
+            justifyContent: .start,
             alignItems: .center,
-            children: [symbolNode, rightStack]
+            children: [symbolNode, spacer, rightStack]
         )
         
         return ASInsetLayoutSpec(
