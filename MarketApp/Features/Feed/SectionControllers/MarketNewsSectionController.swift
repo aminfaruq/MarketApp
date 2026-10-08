@@ -11,7 +11,13 @@ import MarketPresentation
 
 public final class MarketNewsSectionController: ListSectionController, ASSectionController {
     
+    public var onSelect: ((URL) -> Void)?
     private var item: MarketNewsDiffableModel?
+    
+    public override func didSelectItem(at index: Int) {
+        guard let url = item?.viewModel.newsURL else { return }
+        onSelect?(url)
+    }
     
     public override func didUpdate(to object: Any) {
         self.item = object as? MarketNewsDiffableModel
