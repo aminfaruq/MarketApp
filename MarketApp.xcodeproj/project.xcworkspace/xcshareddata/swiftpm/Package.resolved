@@ -1,15 +1,6 @@
 {
-  "originHash" : "bdd81c265305814df69df1c2f076366a7e79724989c34317aa0222d067072461",
+  "originHash" : "87bc79fcccc55ce355a01b2e68fcd580a18765a117cbee40f0c77cddde507f26",
   "pins" : [
-    {
-      "identity" : "iglistkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Instagram/IGListKit.git",
-      "state" : {
-        "revision" : "894c34db0593a0049520ccf9444803db78c64c28",
-        "version" : "5.2.0"
-      }
-    },
     {
       "identity" : "rxswift",
       "kind" : "remoteSourceControl",
