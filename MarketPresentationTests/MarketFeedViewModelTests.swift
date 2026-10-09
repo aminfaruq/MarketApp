@@ -6,6 +6,7 @@
 //
 
 import XCTest
+import RxTest
 import RxSwift
 import MarketCore
 import MarketPresentation
@@ -22,18 +23,18 @@ final class MarketFeedViewModelTests: XCTestCase {
     func test_loadTrigger_requestsDataFromLoaderWithConfiguredSymbols() async {
         let symbols = ["AAPL", "GOOGL"]
         let (sut, loader) = makeSUT(symbols: symbols)
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let quotesObserver = scheduler.createObserver([StockQuoteItemViewModel].self)
+        
         let loadTrigger = PublishSubject<Void>()
         let output = sut.transform(input: .init(loadTrigger: loadTrigger.asObservable()))
         
-        let disposeBag = DisposeBag()
-        let exp = expectation(description: "Wait for feed loading")
-        
-        output.quotes.subscribe(onNext: { _ in
-            exp.fulfill()
-        }).disposed(by: disposeBag)
+        output.quotes.subscribe(quotesObserver).disposed(by: disposeBag)
         
         loadTrigger.onNext(())
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
         XCTAssertEqual(loader.receivedSymbols, [symbols])
         XCTAssertEqual(loader.loadNewsCallCount, 1)
@@ -47,31 +48,23 @@ final class MarketFeedViewModelTests: XCTestCase {
         loader.stubQuotes(with: .success([quote.model]))
         loader.stubNews(with: .success([news.model]))
         
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let quotesObserver = scheduler.createObserver([StockQuoteItemViewModel].self)
+        let newsObserver = scheduler.createObserver([MarketNewsItemViewModel].self)
+        
         let loadTrigger = PublishSubject<Void>()
         let output = sut.transform(input: .init(loadTrigger: loadTrigger.asObservable()))
         
-        var receivedQuotes = [[StockQuoteItemViewModel]]()
-        var receivedNews = [[MarketNewsItemViewModel]]()
-        let disposeBag = DisposeBag()
+        output.quotes.subscribe(quotesObserver).disposed(by: disposeBag)
+        output.news.subscribe(newsObserver).disposed(by: disposeBag)
         
-        let expQuotes = expectation(description: "Wait for quotes")
-        output.quotes
-            .subscribe(onNext: { quotes in
-                receivedQuotes.append(quotes)
-                expQuotes.fulfill()
-            })
-            .disposed(by: disposeBag)
-            
-        let expNews = expectation(description: "Wait for news")
-        output.news
-            .subscribe(onNext: { newsItems in
-                receivedNews.append(newsItems)
-                expNews.fulfill()
-            })
-            .disposed(by: disposeBag)
-            
         loadTrigger.onNext(())
-        await fulfillment(of: [expQuotes, expNews], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        
+        let receivedQuotes = quotesObserver.events.compactMap { $0.value.element }
+        let receivedNews = newsObserver.events.compactMap { $0.value.element }
         
         XCTAssertEqual(receivedQuotes, [[quote.viewModel]])
         XCTAssertEqual(receivedNews, [[news.viewModel]])
@@ -79,134 +72,102 @@ final class MarketFeedViewModelTests: XCTestCase {
     
     func test_loadTrigger_managesLoadingStateCorrectly() async {
         let (sut, _) = makeSUT()
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let loadingObserver = scheduler.createObserver(Bool.self)
+        let refreshingObserver = scheduler.createObserver(Bool.self)
+        
         let loadTrigger = PublishSubject<Void>()
         let output = sut.transform(input: .init(loadTrigger: loadTrigger.asObservable()))
         
-        var loadingStates = [Bool]()
-        var refreshingStates = [Bool]()
-        let disposeBag = DisposeBag()
+        output.isLoading.subscribe(loadingObserver).disposed(by: disposeBag)
+        output.isRefreshing.subscribe(refreshingObserver).disposed(by: disposeBag)
         
-        let exp = expectation(description: "Wait for loading states")
-        output.isLoading
-            .subscribe(onNext: { isLoading in
-                loadingStates.append(isLoading)
-                if loadingStates.count == 3 {
-                    exp.fulfill()
-                }
-            })
-            .disposed(by: disposeBag)
-            
-        output.isRefreshing
-            .subscribe(onNext: { isRefreshing in
-                refreshingStates.append(isRefreshing)
-            })
-            .disposed(by: disposeBag)
-            
         loadTrigger.onNext(())
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
-        XCTAssertEqual(loadingStates, [false, true, false])
-        XCTAssertEqual(refreshingStates, [false])
+        let loadingValues = loadingObserver.events.compactMap { $0.value.element }
+        let refreshingValues = refreshingObserver.events.compactMap { $0.value.element }
+        
+        XCTAssertEqual(loadingValues, [false, true, false])
+        XCTAssertEqual(refreshingValues, [false])
     }
     
     func test_refreshTrigger_managesRefreshingStateCorrectly() async {
         let (sut, _) = makeSUT()
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let refreshingObserver = scheduler.createObserver(Bool.self)
+        let loadingObserver = scheduler.createObserver(Bool.self)
+        
         let refreshTrigger = PublishSubject<Void>()
         let output = sut.transform(input: .init(loadTrigger: .empty(), refreshTrigger: refreshTrigger.asObservable()))
         
-        var refreshingStates = [Bool]()
-        var loadingStates = [Bool]()
-        let disposeBag = DisposeBag()
+        output.isRefreshing.subscribe(refreshingObserver).disposed(by: disposeBag)
+        output.isLoading.subscribe(loadingObserver).disposed(by: disposeBag)
         
-        let exp = expectation(description: "Wait for refreshing states")
-        output.isRefreshing
-            .subscribe(onNext: { isRefreshing in
-                refreshingStates.append(isRefreshing)
-                if refreshingStates.count == 3 {
-                    exp.fulfill()
-                }
-            })
-            .disposed(by: disposeBag)
-            
-        output.isLoading
-            .subscribe(onNext: { isLoading in
-                loadingStates.append(isLoading)
-            })
-            .disposed(by: disposeBag)
-            
         refreshTrigger.onNext(())
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
-        XCTAssertEqual(refreshingStates, [false, true, false])
-        XCTAssertEqual(loadingStates, [false])
+        let refreshingValues = refreshingObserver.events.compactMap { $0.value.element }
+        let loadingValues = loadingObserver.events.compactMap { $0.value.element }
+        
+        XCTAssertEqual(refreshingValues, [false, true, false])
+        XCTAssertEqual(loadingValues, [false])
     }
     
     func test_loadTrigger_deliversErrorAndResetsLoadingOnLoaderFailure() async {
         let (sut, loader) = makeSUT()
         loader.stubQuotes(with: .failure(anyNSError()))
         
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let errorObserver = scheduler.createObserver(String.self)
+        let loadingObserver = scheduler.createObserver(Bool.self)
+        
         let loadTrigger = PublishSubject<Void>()
         let output = sut.transform(input: .init(loadTrigger: loadTrigger.asObservable()))
         
-        var errorMessages = [String]()
-        var loadingStates = [Bool]()
-        let exp = expectation(description: "Wait for error and loading reset")
-        let disposeBag = DisposeBag()
+        output.errorMessage.subscribe(errorObserver).disposed(by: disposeBag)
+        output.isLoading.subscribe(loadingObserver).disposed(by: disposeBag)
         
-        output.errorMessage
-            .subscribe(onNext: { message in
-                errorMessages.append(message)
-            })
-            .disposed(by: disposeBag)
-            
-        output.isLoading
-            .subscribe(onNext: { isLoading in
-                loadingStates.append(isLoading)
-                if loadingStates.count == 3 {
-                    exp.fulfill()
-                }
-            })
-            .disposed(by: disposeBag)
-            
         loadTrigger.onNext(())
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        
+        let errorMessages = errorObserver.events.compactMap { $0.value.element }
+        let loadingValues = loadingObserver.events.compactMap { $0.value.element }
         
         XCTAssertEqual(errorMessages, ["Failed to load market feed. Pull to refresh."])
-        XCTAssertEqual(loadingStates, [false, true, false])
+        XCTAssertEqual(loadingValues, [false, true, false])
     }
     
     func test_refreshTrigger_deliversErrorAndResetsRefreshingOnLoaderFailure() async {
         let (sut, loader) = makeSUT()
         loader.stubNews(with: .failure(anyNSError()))
         
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let errorObserver = scheduler.createObserver(String.self)
+        let refreshingObserver = scheduler.createObserver(Bool.self)
+        
         let refreshTrigger = PublishSubject<Void>()
         let output = sut.transform(input: .init(loadTrigger: .empty(), refreshTrigger: refreshTrigger.asObservable()))
         
-        var errorMessages = [String]()
-        var refreshingStates = [Bool]()
-        let exp = expectation(description: "Wait for error and refreshing reset")
-        let disposeBag = DisposeBag()
+        output.errorMessage.subscribe(errorObserver).disposed(by: disposeBag)
+        output.isRefreshing.subscribe(refreshingObserver).disposed(by: disposeBag)
         
-        output.errorMessage
-            .subscribe(onNext: { message in
-                errorMessages.append(message)
-            })
-            .disposed(by: disposeBag)
-            
-        output.isRefreshing
-            .subscribe(onNext: { isRefreshing in
-                refreshingStates.append(isRefreshing)
-                if refreshingStates.count == 3 {
-                    exp.fulfill()
-                }
-            })
-            .disposed(by: disposeBag)
-            
         refreshTrigger.onNext(())
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        
+        let errorMessages = errorObserver.events.compactMap { $0.value.element }
+        let refreshingValues = refreshingObserver.events.compactMap { $0.value.element }
         
         XCTAssertEqual(errorMessages, ["Failed to load market feed. Pull to refresh."])
-        XCTAssertEqual(refreshingStates, [false, true, false])
+        XCTAssertEqual(refreshingValues, [false, true, false])
     }
     
     func test_stockQuoteItemViewModel_formatsValuesCorrectly() {
