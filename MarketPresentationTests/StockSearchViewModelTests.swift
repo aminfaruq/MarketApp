@@ -7,6 +7,7 @@
 
 import XCTest
 import RxSwift
+import RxTest
 import MarketCore
 import MarketPresentation
 
@@ -20,18 +21,17 @@ final class StockSearchViewModelTests: XCTestCase {
     
     func test_search_requestSearchFromLoader() async {
         let (sut, loader) = makeSUT()
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        let itemsObserver = scheduler.createObserver([SearchResultItemViewModel].self)
+        
         let searchTrigger = PublishSubject<String>()
         let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
         
-        let disposeBag = DisposeBag()
-        let exp = expectation(description: "Wait from loader completion")
-        output.items.subscribe(onNext: { _ in
-            exp.fulfill()
-        })
-        .disposed(by: disposeBag)
+        output.items.subscribe(itemsObserver).disposed(by: disposeBag)
         
         searchTrigger.onNext("AAPL")
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
         XCTAssertEqual(loader.receivedQueries, ["AAPL"])
     }
@@ -40,121 +40,106 @@ final class StockSearchViewModelTests: XCTestCase {
         let (sut, loader) = makeSUT()
         let stock = makeStock(symbol: "AAPL", companyName: "Apple Inc")
         loader.stub(with: .success([stock.model]))
+       
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        let itemsObserver = scheduler.createObserver([SearchResultItemViewModel].self)
         
         let searchTrigger = PublishSubject<String>()
         let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
         
-        var receivedItems = [[SearchResultItemViewModel]]()
-        let disposeBag = DisposeBag()
-        
-        let exp = expectation(description: "Wait from output")
-        output.items
-            .subscribe(onNext: { items in
-                receivedItems.append(items)
-                exp.fulfill()
-            })
-            .disposed(by: disposeBag)
+        output.items.subscribe(itemsObserver).disposed(by: disposeBag)
         
         searchTrigger.onNext("AAPL")
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
-        XCTAssertEqual(receivedItems, [[stock.viewModel]])
+        let items = itemsObserver.events.compactMap { $0.value.element }
+        XCTAssertEqual(items, [[stock.viewModel]])
     }
     
     func test_search_withEmptyOrWhitespaceQuery_doesNotCallLoaderAndClearsItems() async {
         let (sut, loader) = makeSUT()
-        let searchTrigger = PublishSubject<String>()
-        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObserver()))
-        
-        var receivedItems = [[SearchResultItemViewModel]]()
+        let scheduler = TestScheduler(initialClock: 0)
         let disposeBag = DisposeBag()
-        let exp = expectation(description: "Wait output to remove list")
         
-        output.items
-            .subscribe(onNext: { items in
-                receivedItems.append(items)
-                exp.fulfill()
-            })
-            .disposed(by: disposeBag)
+        let itemsObserver = scheduler.createObserver([SearchResultItemViewModel].self)
+        
+        let searchTrigger = PublishSubject<String>()
+        let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
+        
+        output.items.subscribe(itemsObserver).disposed(by: disposeBag)
         
         searchTrigger.onNext("  ")
-        await fulfillment(of: [exp], timeout: 1.0)
         
         XCTAssertTrue(loader.receivedQueries.isEmpty, "Loader Shouldn't called when query is empty or space")
-          XCTAssertEqual(receivedItems, [[]], "Should returnd empty array")
+        XCTAssertEqual(itemsObserver.events, [
+            .next(0, [])
+        ])
     }
     
     func test_search_deliversLoadingState() async {
         let (sut, _) = makeSUT()
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let loadingObserver = scheduler.createObserver(Bool.self)
+        
         let searchTrigger = PublishSubject<String>()
         let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
         
-        var receivedLoadingStates = [Bool]()
-        let disposeBag = DisposeBag()
-        let exp = expectation(description: "Wait for loading")
-        
-        output.isLoading
-            .subscribe(onNext: { isLoading in
-                receivedLoadingStates.append(isLoading)
-                
-                if !isLoading && receivedLoadingStates.count == 3 {
-                    exp.fulfill()
-                }
-            })
-            .disposed(by: disposeBag)
-        
+        output.isLoading.subscribe(loadingObserver).disposed(by: disposeBag)
         output.items.subscribe().disposed(by: disposeBag)
         
         searchTrigger.onNext("AAPL")
-        await fulfillment(of: [exp], timeout: 1.0)
         
-        XCTAssertEqual(receivedLoadingStates, [false, true, false])
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        
+        let values = loadingObserver.events.compactMap { $0.value.element }
+        
+        XCTAssertEqual(values, [false, true, false])
     }
     
     func test_search_deliversErrorMessageOnLoaderFailure() async {
         let (sut, loader) = makeSUT()
         loader.stub(with: .failure(anyNSError()))
         
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let errorObserver = scheduler.createObserver(String.self)
+        
         let searchTrigger = PublishSubject<String>()
         let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
         
-        var receivedErrors = [String?]()
-        let disposeBag = DisposeBag()
-        let exp = expectation(description: "Wait for error")
-        
-        output.errorMessage
-            .subscribe(onNext: { error in
-                receivedErrors.append(error)
-                exp.fulfill()
-            })
-            .disposed(by: disposeBag)
-        
+        output.errorMessage.subscribe(errorObserver).disposed(by: disposeBag)
         output.items.subscribe().disposed(by: disposeBag)
         
         searchTrigger.onNext("AAPL")
-        await fulfillment(of: [exp], timeout: 1.0)
         
-        XCTAssertEqual(receivedErrors, ["Failed to search. Try again later."])
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        
+        let errors = errorObserver.events.compactMap { $0.value.element }
+        
+        XCTAssertEqual(errors, ["Failed to search. Try again later."])
     }
     
     func test_search_doesNotRequestSearchOnDuplicateQuery() async {
         let (sut, loader) = makeSUT()
+        let scheduler = TestScheduler(initialClock: 0)
+        let disposeBag = DisposeBag()
+        
+        let itemsObserver = scheduler.createObserver([SearchResultItemViewModel].self)
+        
         let searchTrigger = PublishSubject<String>()
         let output = sut.transform(input: .init(searchTrigger: searchTrigger.asObservable()))
         
-        let disposeBag = DisposeBag()
-        let exp = expectation(description: "Wait for first search")
-        
-        output.items
-            .subscribe(onNext: { _ in
-                exp.fulfill()
-            })
-            .disposed(by: disposeBag)
+        output.items.subscribe(itemsObserver).disposed(by: disposeBag)
         
         searchTrigger.onNext("AAPL")
-        await fulfillment(of: [exp], timeout: 1.0)
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
         searchTrigger.onNext("AAPL")
+        try? await Task.sleep(nanoseconds: 50_000_000)
         
         XCTAssertEqual(loader.receivedQueries, ["AAPL"])
     }
